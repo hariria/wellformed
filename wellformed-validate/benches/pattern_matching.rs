@@ -1,6 +1,7 @@
 //! Benchmarks for pattern matching (vectorscan vs regex fallback).
 
-use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
+use criterion::{criterion_group, criterion_main, Criterion, Throughput};
+use std::hint::black_box;
 use wellformed_validate::patterns::{
     is_ein_format, is_email_format, is_ssn_format, is_zip_format, PatternDb,
 };

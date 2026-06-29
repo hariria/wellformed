@@ -1,0 +1,182 @@
+---
+title: Introduction
+description: Portable validation schemas for TypeScript and Rust. Author once, validate everywhere.
+---
+
+Validation logic should be data. Write a schema once in TypeScript. It compiles to JSON. The same rules run in TypeScript and Rust, identically. No backend rewrite. No drift.
+
+```text
+TypeScript builder -> JSON IR -> TypeScript runtime
+                              -> Rust runtime
+```
+
+<Tabs items={["npm", "pnpm", "yarn", "bun", "cargo"]}>
+
+<Tab value="npm">
+
+```bash
+npm install wellformed-ts
+```
+
+</Tab>
+
+<Tab value="pnpm">
+
+```bash
+pnpm add wellformed-ts
+```
+
+</Tab>
+
+<Tab value="yarn">
+
+```bash
+yarn add wellformed-ts
+```
+
+</Tab>
+
+<Tab value="bun">
+
+```bash
+bun add wellformed-ts
+```
+
+</Tab>
+
+<Tab value="cargo">
+
+```bash
+cargo add wellformed wellformed-macros serde_json
+```
+
+</Tab>
+
+</Tabs>
+
+## Your first schema, in 30 seconds
+
+<Tabs items={["TypeScript", "Rust"]}>
+
+<Tab value="TypeScript">
+
+```ts
+import { w, validate, type Infer } from "wellformed-ts";
+
+const Contact = w.object({
+  firstName: w.string().trim().minLen(1),
+  lastName: w.string().trim().minLen(1),
+  email: w.string().trim().lower().email(),
+  phone: w.string().phoneUS().optional(),
+  preferredContact: w.enum(["email", "phone", "mail"] as const),
+});
+
+// Types come free. No duplicate definitions.
+type Contact = Infer<typeof Contact>;
+// { firstName: string; lastName: string; email: string;
+//   phone?: string; preferredContact: "email" | "phone" | "mail" }
+
+const result = validate(Contact.toSchema("1.0"), input);
+result.valid; // true | false
+```
+
+</Tab>
+
+<Tab value="Rust">
+
+```rust
+use serde_json::json;
+use wellformed_macros::wellformed;
+
+fn main() -> wellformed::Result<()> {
+    let contact = wellformed!("schemas/contact.json");
+    let (result, value) = contact.validate_json(r#"{
+      "firstName": "  Ada  ",
+      "lastName": "Lovelace",
+      "email": "ADA@EXAMPLE.COM",
+      "preferredContact": "email"
+    }"#)?;
+
+    assert!(result.is_valid());
+    assert_eq!(value["firstName"], json!("Ada"));
+
+    Ok(())
+}
+```
+
+</Tab>
+
+</Tabs>
+
+TypeScript gives you the fluent authoring surface and inferred application type. Rust uses `wellformed!` to embed the same JSON IR as a schema value with native validation helpers.
+
+<PlaygroundButton preset="contact-form">Run this in the Playground</PlaygroundButton>
+
+## Why this is different
+
+Zod hides your rules inside JavaScript functions. wellformed keeps them as JSON. That single decision is the whole product: the schema becomes portable.
+
+```ts
+import { w, schemaToJSON } from "wellformed-ts";
+
+const schema = w
+  .object({
+    ssn: w.string().digitsOnly().ssn(),
+  })
+  .toSchema("1.0");
+
+schemaToJSON(schema, true);
+```
+
+```json
+{
+  "version": "1.0",
+  "root": {
+    "type": "object",
+    "properties": {
+      "ssn": {
+        "type": "string",
+        "transforms": [{ "fn": "digits_only" }],
+        "constraints": [
+          {
+            "pred": { "type": "call", "name": "is_ssn" },
+            "error": {
+              "code": "INVALID_SSN",
+              "message": "Invalid Social Security Number"
+            }
+          }
+        ]
+      }
+    }
+  }
+}
+```
+
+Every transform, predicate, and error code is plain JSON. Store it in a database. Send it over the wire. Deserialize it in the Rust `wellformed` crate. Same results, no JavaScript required.
+
+<Callout title="The whole idea, in one sentence">
+  Validation that crosses a runtime boundary should be data, not a closure.
+</Callout>
+
+## Where to go next
+
+<Cards>
+  <Card title="Getting Started" href="/docs/getting-started">
+    Install and validate your first schema in under a minute.
+  </Card>
+  <Card title="Playground" href="/playground">
+    Edit a schema and watch a real form validate live.
+  </Card>
+  <Card title="Validate in Rust" href="/docs/rust-runtime">
+    Run the same IR natively in the Rust crate.
+  </Card>
+  <Card title="Domain validators" href="/docs/predicates">
+    60+ built-in predicates: SSN, EIN, CUSIP, IBAN, ICD-10.
+  </Card>
+  <Card title="Cross-field rules" href="/docs/builder/cross-field-rules">
+    Conditional requirements and comparisons, as data.
+  </Card>
+  <Card title="vs Zod and JSON Schema" href="/docs/comparison">
+    When to reach for wellformed, and when not to.
+  </Card>
+</Cards>

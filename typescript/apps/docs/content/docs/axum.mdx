@@ -1,0 +1,113 @@
+---
+title: Axum
+description: Validate untrusted JSON before it becomes a Rust struct.
+---
+
+Use wellformed at the HTTP boundary:
+
+```text
+JSON body -> serde_json::Value -> wellformed -> Rust struct -> app logic
+```
+
+Axum only deserializes into your domain type if you ask it to. Use `Json<Value>` for external input, run wellformed, then convert the validated value into your Rust type.
+
+## Install
+
+```bash
+cargo add axum wellformed serde_json
+cargo add serde --features derive
+```
+
+## Load the Schema Once
+
+Share the same serialized schema JSON that your TypeScript code emits:
+
+```rust
+use std::sync::Arc;
+use wellformed::Schema;
+
+#[derive(Clone)]
+struct AppState {
+    contact_schema: Arc<Schema>,
+}
+
+fn app_state() -> AppState {
+    let schema = serde_json::from_str(include_str!("../schemas/contact.json"))
+        .expect("valid wellformed schema");
+
+    AppState {
+        contact_schema: Arc::new(schema),
+    }
+}
+```
+
+Use `wellformed_macros::wellformed!` when you prefer a compile-time embedded schema handle. Use `serde_json::from_str` when your service loads schema files from config, object storage, or another build artifact.
+
+## Validate First
+
+```rust
+use axum::{extract::State, http::StatusCode, Json};
+use serde::Deserialize;
+use serde_json::{json, Value};
+use wellformed::validate;
+
+type ApiError = (StatusCode, Json<Value>);
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Contact {
+    first_name: String,
+    email: String,
+    age: Option<i64>,
+}
+
+async fn create_contact(
+    State(state): State<AppState>,
+    Json(mut body): Json<Value>,
+) -> Result<Json<Contact>, ApiError> {
+    let result = validate(&state.contact_schema, &mut body).map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error.to_string() })),
+        )
+    })?;
+
+    if !result.is_valid() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "errors": result.errors })),
+        ));
+    }
+
+    let contact = serde_json::from_value::<Contact>(body).map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error.to_string() })),
+        )
+    })?;
+
+    Ok(Json(contact))
+}
+```
+
+After `validate` succeeds, `body` contains the normalized value. Transforms have run, unknown-key behavior has been applied, and error codes came from your schema instead of Axum's default JSON extractor error.
+
+## Avoid Typed-First Boundaries
+
+This is fine for trusted internal input:
+
+```rust
+async fn create_contact(Json(contact): Json<Contact>) {
+    // Serde already accepted the body.
+}
+```
+
+It is the wrong default for public API input. Serde can reject the request before wellformed sees it, so your schema cannot trim strings, strip unknown keys, apply cross-field rules, or return stable validation error codes.
+
+## Production Notes
+
+- Load and parse schemas during startup, then store them in Axum state.
+- Keep the Rust struct aligned with the wellformed schema. A post-validation Serde failure usually means the schema and struct drifted.
+- Prefer `.strict()` or `.strip()` for external request bodies.
+- Register custom predicates before serving traffic if the schema uses organization-specific checks.
+- Keep raw request bodies only when you have a concrete audit or compliance requirement. App logic should use the validated value.

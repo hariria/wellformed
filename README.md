@@ -11,11 +11,10 @@ the exact same rules in TypeScript and Rust.
 
 [![npm](https://img.shields.io/npm/v/wellformed-ts?style=flat-square&logo=npm&color=76CE54&label=wellformed-ts)](https://www.npmjs.com/package/wellformed-ts)
 [![crates.io](https://img.shields.io/crates/v/wellformed?style=flat-square&logo=rust&color=76CE54&label=wellformed)](https://crates.io/crates/wellformed)
-[![CI](https://img.shields.io/github/actions/workflow/status/hariria/wellformed/ci.yml?style=flat-square&logo=github&label=CI)](https://github.com/hariria/wellformed/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-76CE54?style=flat-square)](LICENSE)
 [![X](https://img.shields.io/badge/X-76CE54?style=flat-square&logo=x&logoColor=white)](https://x.com/drewhariri)
 
-[**Docs**](https://wellformed.dev) · [**Playground**](https://wellformed.dev/playground) · [Getting Started](https://wellformed.dev/docs/getting-started) · [Comparison](https://wellformed.dev/docs/comparison)
+[**Docs**](https://wellformed.net) · [**Playground**](https://wellformed.net/playground) · [Getting Started](https://wellformed.net/docs/getting-started) · [Comparison](https://wellformed.net/docs/comparison)
 
 </div>
 
@@ -36,9 +35,24 @@ the exact same rules in TypeScript and Rust.
 - **Transform pipeline.** Normalize before you validate (trim, digits-only,
   money-to-cents, date parsing). Transforms travel inside the schema, so every
   runtime cleans data the same way.
-- **Fast.** Built-in predicates validate in tens of nanoseconds, roughly 10 to
-  40x faster than Zod in the same V8 runtime, with the Rust runtime faster
-  still. [See the benchmark](https://wellformed.dev/docs/performance).
+- **Fast.** Built-in predicates validate in tens of nanoseconds and stay
+  competitive with the fastest validation libraries, while keeping schemas
+  portable across TypeScript and Rust.
+
+## Performance snapshot
+
+Steady-state validation, lower is better. The Rust numbers are dynamic JSON
+validation with `wellformed::validate(&schema, &mut serde_json::Value)`, not
+generated typed Rust.
+
+| Case | Rust dynamic JSON | TypeScript | Valibot | Zod |
+| --- | ---: | ---: | ---: | ---: |
+| Email | ~58 ns | ~61 ns | ~53 ns | ~2.73 us |
+| HTTP URL | ~58 ns | ~106 ns | ~1.31 us | ~4.41 us |
+| UUID | ~76 ns | ~77 ns | ~82 ns | ~2.82 us |
+| Object | ~544 ns | ~411 ns | ~517 ns | ~4.35 us |
+
+[See the full methodology and benchmark table](https://wellformed.net/docs/performance).
 
 ## Install
 
@@ -87,7 +101,7 @@ Schemas compile to a portable JSON intermediate representation. Store it in a
 database, diff it in code review, send it over the wire, and evaluate it in any
 runtime. The same JSON your frontend authored deserializes into the Rust
 `wellformed` crate and validates with identical results.
-[Read the IR reference](https://wellformed.dev/docs/ir-schema).
+[Read the IR reference](https://wellformed.net/docs/ir-schema).
 
 ## Workspace layout
 
@@ -148,7 +162,7 @@ pnpm --filter @wellformed/docs dev
 
 The TypeScript package ships `skills.md`, a compact agent guide for integrating
 wellformed into applications. The docs site exposes
-[`/llms-full.txt`](https://wellformed.dev/llms-full.txt) for full-documentation
+[`/llms-full.txt`](https://wellformed.net/llms-full.txt) for full-documentation
 context and `/docs/<path>.md` markdown twins for individual pages.
 
 ## Contributing

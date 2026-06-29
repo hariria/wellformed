@@ -1,0 +1,143 @@
+---
+title: Performance
+description: Dynamic validation benchmark results for Zod, Valibot, Yup, wellformed-ts, and the wellformed Rust runtime.
+---
+
+## Results
+
+Same schemas. Same sample inputs. Validators are built once and reused.
+The harness checks that every library accepts and rejects the same samples
+before timing.
+
+<Callout type="warn" title="Read this first">
+  The Rust column is dynamic JSON validation:
+  `wellformed::validate(&schema, &mut serde_json::Value)`.
+
+  It is **not** generated typed Rust validation.
+  It is **not** Serde deserialization into a Rust struct.
+  It validates arbitrary submitted JSON before the data is trusted.
+</Callout>
+
+| Case | Rust dynamic JSON `validate()` | TS `validate()` | Valibot | Zod | Yup |
+|---|---:|---:|---:|---:|---:|
+| Email | ~58 ns | ~61 ns | ~53 ns | ~2.73 us | ~9.09 us |
+| HTTP URL | ~58 ns | ~106 ns | ~1.31 us | ~4.41 us | ~10.05 us |
+| UUID | ~76 ns | ~77 ns | ~82 ns | ~2.82 us | ~8.35 us |
+| SSN | ~56 ns | ~85 ns | ~100 ns | ~2.56 us | ~8.34 us |
+| Credit card | ~105 ns | ~132 ns | ~174 ns | ~2.65 us | ~8.48 us |
+| IBAN | ~137 ns | ~197 ns | ~200 ns | ~2.65 us | ~8.58 us |
+| Object | ~544 ns | ~411 ns | ~517 ns | ~4.35 us | ~17.47 us |
+
+## Harness
+
+```bash
+pnpm --filter wellformed-ts bench:validators
+cargo bench -p wellformed --bench predicates
+```
+
+| Item | Value |
+|---|---|
+| Machine | Apple Silicon |
+| Node | `v23.2.0` |
+| Packages | `wellformed-ts@0.1.0`, `valibot@1.4.2`, `zod@4.4.3`, `yup@1.7.1` |
+| TypeScript harness | 7 rounds x 100,000 iterations, 10,000 warmup iterations |
+| Rust harness | `bench` profile, 100,000 iterations per case |
+
+## What Is Measured
+
+| Mode | In table? | What runs |
+|---|---:|---|
+| wellformed Rust dynamic runtime | Yes | `wellformed::validate(&schema, &mut value)` over `serde_json::Value`. |
+| wellformed-ts dynamic runtime | Yes | `validate(schema, input).valid` against compiled `dist` output. |
+| Valibot | Yes | `safeParse(schema, input).success`. |
+| Zod | Yes | `schema.safeParse(input).success`. |
+| Yup | Yes | `schema.isValidSync(input, { strict: true, abortEarly: false })`. |
+| wellformed Rust generated typed validation | No | Direct field access on a generated Rust `Values` struct. Separate mode. Not included yet. |
+| Serde deserialization into a Rust struct | No | Type conversion, not wellformed validation. No wellformed field errors. |
+
+Why Rust uses `serde_json::Value` here:
+
+- Submitted data is untrusted JSON.
+- Wrong types, missing fields, nulls, unknown keys, unions, defaults,
+  transforms, refs, and cross-field rules must return wellformed errors.
+- Deserializing first can reject data before wellformed sees it.
+- Generated typed Rust validation exists, but does not yet cover the full
+  schema surface. Benchmark it separately when it does.
+
+Object schema:
+
+```ts
+{
+  email: string.email,
+  age: integer in [18, 99],
+  website: http/https URL,
+  ssn: semantic SSN,
+}
+```
+
+Format rules:
+
+- Email, URL, and UUID use each library's built-in validators.
+- SSN, credit card, and IBAN use wellformed built-ins. Libraries without those
+  built-ins use equivalent custom predicates.
+- Raw regex is not in the main table. It usually checks shape, not full domain
+  rules or checksums.
+
+## Rust Predicate Internals
+
+This is not the main comparison. It skips schema walking and validation result
+construction. It shows the cost of the Rust predicate itself.
+
+| Rust predicate case | Approx latency |
+|---|---:|
+| `phone_number` (US) | ~16 ns |
+| `template_literal` (`SFO-####-AA`) | ~17 ns |
+| `is_ssn` | ~18 ns |
+| `phone_number_us` | ~18 ns |
+| `luhn` | ~19 ns |
+| `phone_number` (intl) | ~21 ns |
+| `is_email` | ~31 ns |
+| `is_url` | ~41 ns |
+| `is_date` | ~48 ns |
+| `is_uuid` | ~48 ns |
+| `is_credit_card` | ~61 ns |
+| `is_iban` | ~123 ns |
+| `is_aba_routing` | ~130 ns |
+| `regex` (`^\d{9}$`) | ~3.68 us |
+| `regex` (`^SFO-\d{3,4}-[A-Z]{2}$`) | ~3.69 us |
+
+Takeaway: for structured formats, purpose-built predicates and
+`templateLiteral([...])` beat generic regex in the Rust runtime.
+
+Some Rust predicate paths use SIMD-friendly primitives through dependencies
+like `memchr`; this is enabled by default and is not a feature flag.
+
+## Caveats
+
+- These are microbenchmarks.
+- Email and URL validation are policy choices. There is no single universal
+  truth.
+- The sample set is narrow by design so all libraries agree on pass/fail.
+- The Rust table row is dynamic JSON validation, not typed generated Rust.
+- The TypeScript rows run in V8. The Rust rows run native code. Different
+  runtimes, different costs.
+
+## Reproduce Locally
+
+```bash
+cd typescript
+pnpm --filter wellformed-ts bench:validators
+```
+
+```bash
+cd typescript
+pnpm --filter wellformed-ts bench:validators:json
+```
+
+```bash
+cargo bench -p wellformed --bench predicates
+```
+
+The TypeScript harness lives at
+`typescript/packages/wellformed/benchmarks/validators.mjs`. The Rust harness
+lives at `wellformed/benches/predicates.rs`.

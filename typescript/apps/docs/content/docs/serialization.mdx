@@ -1,0 +1,154 @@
+---
+title: Serialization
+description: schemaToJSON, parseSchema, validateSchema, and round-trip serialization
+---
+
+wellformed schemas compile to a portable JSON intermediate representation. This enables storing schemas in databases, transmitting them over the wire, and evaluating them in different runtimes (TypeScript, Rust, etc.).
+
+<Callout title="Serialize when rules cross a boundary">
+  If validation stays inside one TypeScript module, pass the builder output
+  directly. Serialize when a schema needs to be stored, sent, audited, or
+  evaluated in another runtime.
+</Callout>
+
+```text
+w.object(...) -> toSchema("1.0") -> schemaToJSON(...) -> parseSchema(...) -> validate(...)
+```
+
+## schemaToJSON()
+
+Serialize a `Schema` to a JSON string:
+
+```ts
+import { w, schemaToJSON } from "wellformed-ts";
+
+const schema = w.object({
+  name: w.string().trim().minLen(1),
+  age: w.integer().min(0),
+}).toSchema("1.0");
+
+const json = schemaToJSON(schema);
+// Compact JSON string
+
+const pretty = schemaToJSON(schema, true);
+// Pretty-printed JSON
+```
+
+### Example Output
+
+```json
+{
+  "version": "1.0",
+  "root": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "type": "string",
+        "transforms": [{ "fn": "trim" }],
+        "constraints": [{
+          "pred": { "type": "min_len", "len": 1 },
+          "error": { "code": "TOO_SHORT", "message": "Must be at least 1 characters" }
+        }]
+      },
+      "age": {
+        "type": "integer",
+        "constraints": [{
+          "pred": { "type": "range", "min": 0 },
+          "error": { "code": "OUT_OF_RANGE", "message": "Must be >= 0" }
+        }]
+      }
+    }
+  }
+}
+```
+
+## parseSchema()
+
+Parse a JSON string back to a `Schema` object:
+
+```ts
+import { parseSchema, SchemaParseError } from "wellformed-ts";
+
+try {
+  const schema = parseSchema(json);
+  // schema is a validated Schema object
+} catch (e) {
+  if (e instanceof SchemaParseError) {
+    console.log(e.message); // "Schema.version must be a string"
+    console.log(e.path);    // "/root" (where the error occurred)
+  }
+}
+```
+
+`parseSchema` validates the structure:
+- `version` must be a string
+- `root` must be present and valid
+- All type schemas must have a valid `type` field
+- Object properties must be valid type schemas
+- Array `items` must be present
+- Enum `values` must be an array (any JSON values, not only strings)
+- Union `oneOf` must be an array of type schemas
+
+## validateSchema()
+
+Validate an already-parsed object (useful when you already have JSON.parse'd data):
+
+```ts
+import { validateSchema } from "wellformed-ts";
+
+const data = JSON.parse(jsonString);
+const schema = validateSchema(data);
+```
+
+## Round-Trip
+
+Schemas survive JSON serialization and deserialization:
+
+```ts
+import { w, schemaToJSON, parseSchema, validate } from "wellformed-ts";
+
+// 1. Build
+const original = w.object({
+  email: w.string().email(),
+  age: w.integer().min(0),
+}).toSchema("1.0");
+
+// 2. Serialize
+const json = schemaToJSON(original);
+
+// 3. Deserialize
+const restored = parseSchema(json);
+
+// 4. Validate with restored schema
+const result = validate(restored, { email: "test@example.com", age: 25 });
+console.log(result.valid); // true
+```
+
+## Schema Structure
+
+The top-level `Schema` interface:
+
+```ts
+interface Schema {
+  version: string;          // Schema version
+  id?: string;              // Optional identifier
+  title?: string;           // Optional title
+  description?: string;     // Optional description
+  definitions?: Record<string, TypeSchema>; // Reusable type definitions
+  root: TypeSchema;         // The root type schema
+}
+```
+
+## toSchema()
+
+Builders produce a `TypeSchema`. Use `.toSchema(version)` to wrap it in a full `Schema`:
+
+```ts
+const typeSchema = w.string().email().toTypeSchema();
+// { type: "string", constraints: [...] }
+
+const schema = w.string().email().toSchema("1.0");
+// { version: "1.0", root: { type: "string", constraints: [...] } }
+```
+
+The `toSchema` method is available on all builders through the `BaseBuilder` class.

@@ -1,0 +1,277 @@
+---
+title: Predicates
+description: PredicateRegistry, built-in predicates, and custom predicates
+---
+
+Most users should start with builder methods. They create predicate IR for you.
+
+| Need | Builder |
+|---|---|
+| Email, URL, phone, UUID | `w.string().email()`, `.url()`, `.phone()`, `.uuid()` |
+| SSN, EIN, ITIN, TIN | `w.string().ssn()`, `.ein()`, `.itin()`, `.tin()` |
+| Financial identifiers | `w.string().creditCard()`, `.iban()`, `.abaRouting()`, `.cusip()` |
+| Healthcare and reference codes | `w.string().npi()`, `.icd10Code()`, `.usState()`, `.currencyCode()` |
+| Cross-field business rules | `w.object(...).when(...)`, `.requireOneOf(...)`, `.requireSum(...)` |
+
+<Callout title="When to use this page">
+  Use this reference when you need to inspect serialized IR, register a custom
+  predicate, or build validation tooling.
+</Callout>
+
+## Predicate IR
+
+Predicates are the boolean evaluation units inside constraints. A constraint pairs a predicate with error metadata:
+
+```json
+{
+  "pred": { "type": "call", "name": "is_email" },
+  "error": {
+    "code": "INVALID_EMAIL",
+    "message": "Enter a valid email address"
+  }
+}
+```
+
+Work with predicate IR directly for advanced rules, schema tooling, and tests.
+
+## Predicate Types
+
+| Type | Description |
+|------|-------------|
+| `true` / `false` | Constant predicates |
+| `regex` | Regular expression match |
+| `template_literal` | Structured string scanner made from literal and character-class parts |
+| `min_len` / `max_len` | String or array length |
+| `range` | Numeric range |
+| `exists` | JSON Pointer exists and is not null or undefined |
+| `eq` | Value at path equals a literal |
+| `in` | Value at path is one of several values |
+| `required_with` | A field is required when another field exists |
+| `required_without` | A field is required when another field is absent |
+| `exactly_one_of` | Exactly one path in a set exists |
+| `eq_fields` | Two fields are equal |
+| `gt_field` / `gte_field` | Field comparison, greater than |
+| `lt_field` / `lte_field` | Field comparison, less than |
+| `sum_equals` | Sum of fields equals another field |
+| `sum_equals_value` | Sum of fields equals a literal value |
+| `and` / `or` / `not` | Boolean composition |
+| `implies` | If predicate A is true, predicate B must be true |
+| `call` | Named predicate resolved by `PredicateRegistry` |
+
+## PredicateRegistry
+
+Named predicates use the `call` type and are resolved through a registry:
+
+```ts
+import { PredicateRegistry, createEvalContext } from "wellformed-ts";
+
+const registry = PredicateRegistry.withBuiltins();
+const ctx = createEvalContext(registry);
+```
+
+`validate(...)` uses built-ins by default. Pass a custom context when a schema calls predicates that are not built in:
+
+```ts
+const result = validate(schema, data, { context: ctx });
+```
+
+## Built-In Predicates
+
+### Taxpayer Identifiers
+
+| Name | Description |
+|------|-------------|
+| `is_tin` | Any supported US TIN |
+| `is_ssn` | Social Security Number |
+| `is_ein` | Employer Identification Number |
+| `is_itin` | Individual Taxpayer Identification Number |
+| `is_atin` | Adoption Taxpayer Identification Number |
+| `luhn` | Luhn checksum |
+
+### Financial, Payment, and Product Identifiers
+
+| Name | Description |
+|------|-------------|
+| `is_cusip` | CUSIP identifier |
+| `is_aba_routing` | ABA routing transit number |
+| `is_mcc` | Merchant Category Code |
+| `is_account_number` | Account number with configurable length and hyphen behavior |
+| `is_credit_card` | Payment card number with Luhn validation |
+| `is_cvv` | Card security code |
+| `is_card_expiry` | Card expiry in supported month/year formats |
+| `is_iban` | International Bank Account Number |
+| `is_bic` | BIC code |
+| `is_swift` | SWIFT code alias |
+| `is_vin` | Vehicle Identification Number |
+| `is_upc` | UPC barcode |
+| `is_ean` | EAN barcode |
+| `is_isbn` | ISBN |
+
+### Dates and Times
+
+| Name | Description |
+|------|-------------|
+| `is_date` | Date string |
+| `is_time` | Time string |
+| `is_iso_datetime` | ISO 8601 date-time |
+| `is_tax_year` | Tax year in a configurable range |
+| `date_in_range` | Date within min/max bounds |
+| `date_before` | Date before a target |
+| `date_after` | Date after a target |
+| `time_before` | Time before a target |
+| `time_after` | Time after a target |
+| `time_in_range` | Time within a range, including overnight ranges |
+
+### Amounts and Numeric Values
+
+| Name | Description |
+|------|-------------|
+| `is_non_negative` | Number is greater than or equal to 0 |
+| `is_positive` | Number is greater than 0 |
+| `is_negative` | Number is less than 0 |
+| `is_non_positive` | Number is less than or equal to 0 |
+| `is_percentage` | Percentage value |
+| `is_money_format` | Money string with currency symbol support |
+| `is_money_no_symbol` | Money string without a leading currency symbol |
+| `is_multiple_of` | Number is a multiple of the configured step |
+| `less_than_or_equal` | Number is less than or equal to the configured value |
+| `greater_than_or_equal` | Number is greater than or equal to the configured value |
+| `is_decimal_places` | Number or numeric string has at most N decimal places |
+| `is_integer` | Integer number or integer string |
+| `is_float` | Floating-point number or numeric string |
+| `is_u8` / `is_u16` / `is_u32` / `is_u64` | Unsigned integer range checks |
+| `is_i8` / `is_i16` / `is_i32` / `is_i64` | Signed integer range checks |
+
+### Reference Data
+
+| Name | Description |
+|------|-------------|
+| `is_country_code` | ISO 3166-1 alpha-2 country code |
+| `is_country_name` | Country name (e.g. "Canada") |
+| `is_currency_code` | ISO 4217 currency code |
+| `is_us_state` | US state or territory code |
+| `is_state_name` | US state or territory name (e.g. "Puerto Rico") |
+| `is_us_zip` | US ZIP code |
+| `is_street_address` | Basic street-address shape check |
+| `is_w2_box12_code` | W-2 Box 12 code |
+| `is_1099b_code` | 1099-B code |
+| `is_filing_status` | US tax filing status (e.g. "mfj", "single") |
+
+### Contact and Network Fields
+
+| Name | Description |
+|------|-------------|
+| `phone_number` | General phone number |
+| `phone_number_us` | US phone number |
+| `is_phone` | Phone number alias used by the TypeScript builder |
+| `is_email` | Email address |
+| `is_url` | URL |
+| `is_uuid` | UUID |
+| `is_ip` | IPv4 or IPv6 address |
+| `is_cidr` | CIDR block |
+| `is_mac_address` | MAC address |
+
+### Text and String Shape
+
+| Name | Description |
+|------|-------------|
+| `is_rtl` | Contains right-to-left script characters |
+| `is_ltr` | Contains left-to-right script characters |
+| `starts_with` | String starts with configured value |
+| `ends_with` | String ends with configured value |
+| `contains` | String contains configured value |
+| `is_alpha` | ASCII letters only |
+| `is_digits` | ASCII digits only |
+| `is_alphanumeric` | ASCII letters and digits only |
+| `is_alpha_spaces` | ASCII letters and spaces, with at least one letter |
+| `is_alphanumeric_spaces` | ASCII letters, digits, and spaces, with at least one alphanumeric character |
+| `is_name_chars` | ASCII letters, hyphens, and apostrophes, with at least one letter |
+| `is_uppercase` | Uppercase ASCII letters only |
+| `is_lowercase` | Lowercase ASCII letters only |
+| `is_title_case` | One uppercase ASCII letter followed by lowercase ASCII letters |
+
+### Aviation
+
+| Name | Description |
+|------|-------------|
+| `is_iata_airport_code` | IATA airport code |
+| `is_icao_airport_code` | ICAO airport code |
+| `is_airport_code` | IATA or ICAO airport code |
+| `is_iata_airline_code` | IATA airline code |
+| `is_icao_airline_code` | ICAO airline code |
+| `is_airline_code` | IATA or ICAO airline code |
+| `is_flight_number` | Flight number |
+
+### Healthcare and Insurance
+
+| Name | Description |
+|------|-------------|
+| `is_npi` | National Provider Identifier |
+| `is_dea_number` | DEA registration number |
+| `is_icd10_code` | ICD-10 code |
+| `is_cpt_code` | CPT code |
+| `is_hcpcs_code` | HCPCS code |
+| `is_ndc_code` | NDC code |
+
+### Color, Encoding, and Crypto Shape
+
+| Name | Description |
+|------|-------------|
+| `is_hex_color` | Hex color |
+| `is_rgb_color` | CSS `rgb(...)` color |
+| `is_hsl_color` | CSS `hsl(...)` color |
+| `is_base58` | Base58 string |
+| `is_base64` | Base64 string |
+| `is_bitcoin_address` | Bitcoin address shape |
+| `is_ethereum_address` | Ethereum address shape |
+| `is_solana_address` | Solana address shape |
+| `is_jwt` | JSON Web Token shape |
+| `is_hash` | Hash string with configurable algorithm/length expectations |
+
+## Custom Predicates
+
+Register custom predicates for organization-specific validation:
+
+```ts
+const registry = PredicateRegistry.withBuiltins();
+
+registry.register("is_even", (value) => {
+  return typeof value === "number" && value % 2 === 0;
+});
+
+registry.register("divisible_by", (value, args) => {
+  if (typeof value !== "number") return false;
+  const divisor = (args as { value: number }).value;
+  return value % divisor === 0;
+});
+```
+
+Use custom predicates through `call` predicates:
+
+```ts
+const schema = w.object({
+  count: w.integer(),
+}).rule(
+  { type: "call", name: "divisible_by", args: { value: 5 } },
+  "NOT_DIVISIBLE_BY_5",
+  "Count must be divisible by 5",
+);
+```
+
+Custom predicate implementations are not serialized into the IR. Every runtime that evaluates a schema must register equivalent implementations for the predicate names it uses.
+
+## Direct Evaluation
+
+For advanced tooling, you can evaluate predicate IR directly:
+
+```ts
+import { createEvalContext, evaluate } from "wellformed-ts";
+
+const ctx = createEvalContext();
+
+evaluate({ type: "regex", pattern: "^\\d+$" }, "123", ctx); // true
+evaluate({ type: "range", min: 0, max: 100 }, 50, ctx); // true
+evaluate({ type: "exists", path: "/name" }, { name: "Alice" }, ctx); // true
+```
+
+Direct evaluation is useful for schema tooling, tests, and custom rule builders. Application validation should usually go through `validate(...)` so transforms, type checks, object rules, and error metadata are handled together.

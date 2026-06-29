@@ -1,0 +1,38 @@
+{
+  "name": "wellformed-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "turbo build",
+    "dev": "turbo dev",
+    "lint": "turbo lint",
+    "format": "turbo format",
+    "types:check": "turbo types:check",
+    "test": "turbo test",
+    "test:package": "pnpm --filter wellformed-ts test:package",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.1",
+    "@changesets/cli": "^2.31.0",
+    "turbo": "^2.10.0"
+  },
+  "packageManager": "pnpm@9.15.1",
+  "pnpm": {
+    "overrides": {
+      "dompurify": "3.4.11",
+      "esbuild": "0.25.0",
+      "js-yaml": "4.2.0",
+      "picomatch@^2.3.1": "2.3.2",
+      "picomatch@^4.0.3": "4.0.4",
+      "postcss": "8.5.10",
+      "read-yaml-file": "2.1.0",
+      "rollup": "4.59.0"
+    }
+  }
+}

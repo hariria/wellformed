@@ -1,0 +1,62 @@
+---
+title: AI Integration
+description: Markdown endpoints and context files for coding agents integrating wellformed.
+---
+
+# AI Integration
+
+wellformed includes AI-friendly artifacts for coding agents that need to add
+portable validation to an application.
+
+## Packaged Skill
+
+The npm package ships `skills.md`. Give this file to an AI coding tool when
+asking it to integrate wellformed into a project. It covers:
+
+- when to use wellformed instead of closure-based validation
+- bundle-friendly import paths
+- schema authoring and type inference
+- runtime validation
+- React Hook Form resolver integration
+- serialized IR and Rust runtime boundaries
+- common security and versioning mistakes
+
+## Markdown Docs
+
+The docs site exposes markdown routes for agents and retrieval systems:
+
+- `/llms-full.txt` - full documentation text
+- `/docs/<path>.md` - one documentation page as processed markdown
+
+For example, `/docs/getting-started` has a markdown twin at
+`/docs/getting-started.md`, and `/docs/builder/objects` has a markdown twin at
+`/docs/builder/objects.md`.
+
+Each docs page also includes page actions for copying or opening its markdown
+version.
+
+## Recommended Prompt
+
+```text
+Use wellformed for validation. Read the package skills.md and the relevant docs pages before editing.
+
+Requirements:
+- Author schemas with the TypeScript builder API.
+- Serialize schemas with toSchema("1.0") when crossing process or runtime boundaries.
+- Validate serialized schemas with wellformed-ts/runtime.
+- Use wellformed-ts/ir for schema types and avoid importing the top-level package in client runtime-only code.
+- Prefer .strict() or .strip() for external input.
+- Use stable FormError.code values for application logic.
+- Add tests for valid input, invalid input, transforms, unknown-key behavior, and cross-field rules.
+```
+
+## Validation Checklist
+
+Before accepting AI-generated integration code, verify:
+
+- object schemas choose `.strict()`, `.strip()`, `.passthrough()`, or `.catchall(...)` intentionally
+- optional fields use `.optional()` or `optional(...)`
+- transformed output comes from `result.value`, not the original input
+- custom predicates are registered in every runtime that evaluates the schema
+- serialized schemas are stored with application-level schema identifiers and migration metadata
+- sensitive examples do not include real personal, financial, healthcare, or tax data

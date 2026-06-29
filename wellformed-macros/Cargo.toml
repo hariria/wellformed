@@ -1,0 +1,28 @@
+[package]
+name = "wellformed-macros"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.93.0"
+description = "Proc macros for generating Rust types and form facades from wellformed schemas"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/hariria/wellformed"
+homepage = "https://wellformed.net"
+documentation = "https://docs.rs/wellformed-macros"
+keywords = ["validation", "schema", "forms", "proc-macro"]
+categories = ["development-tools"]
+
+[lib]
+proc-macro = true
+
+[dependencies]
+proc-macro2 = "1"
+quote = "1"
+syn = { version = "2", features = ["full", "parsing"] }
+wellformed = { version = "0.1.0", path = "../wellformed" }
+serde_json = "1.0"
+
+[dev-dependencies]
+serde_json = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+wellformed = { version = "0.1.0", path = "../wellformed" }

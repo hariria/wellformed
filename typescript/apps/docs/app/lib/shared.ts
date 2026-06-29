@@ -5,10 +5,10 @@ export const docsRoute = "/docs";
 // and a dev-server middleware serves the same URLs during `pnpm dev`.
 export const markdownGenRoute = "/_docs-md";
 
-export const siteUrl = "https://wellformed.dev";
+export const siteUrl = "https://wellformed.net";
 
 export const gitConfig = {
-  user: "acrof",
+  user: "hariria",
   repo: "wellformed",
   branch: "main",
   // Path to the docs content within the repo, for "edit on GitHub" links.

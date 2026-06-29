@@ -1,0 +1,166 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  TURBO_TELEMETRY_DISABLED: 1
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  rust-msrv:
+    name: Rust MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust 1.93.0
+        uses: dtolnay/rust-toolchain@1.93.0
+
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/git
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-msrv-1.93.0-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-msrv-1.93.0-
+
+      - name: Check Workspace
+        run: cargo check --workspace --all-targets --locked
+
+  rust:
+    name: Rust
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/git
+            ~/.cargo/registry
+            target
+          key: ${{ runner.os }}-cargo-stable-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-stable-
+
+      - name: Format Check
+        run: cargo fmt --check
+
+      - name: Clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+
+      - name: Rustdoc
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps
+
+      - name: Cache cargo-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-0.22.1
+
+      - name: Install cargo-audit
+        run: |
+          if ! command -v cargo-audit >/dev/null 2>&1; then
+            cargo install cargo-audit --locked --version 0.22.1
+          fi
+          cargo audit --version
+
+      - name: Audit Dependencies
+        run: cargo audit
+
+      - name: Test
+        run: cargo test --workspace
+
+      - name: Package Leaf Crate
+        run: cargo package -p wellformed-validate
+
+      - name: Check Dependent Crate Package Manifests
+        run: |
+          cargo package -p wellformed --no-verify --list >/dev/null
+          cargo package -p wellformed-macros --no-verify --list >/dev/null
+
+  typescript:
+    name: TypeScript
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+          cache-dependency-path: typescript/pnpm-lock.yaml
+
+      - name: Cache Turbo
+        uses: actions/cache@v4
+        with:
+          path: typescript/.turbo/cache
+          key: ${{ runner.os }}-turbo-${{ hashFiles('typescript/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-turbo-
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+        working-directory: typescript
+
+      - name: Audit Dependencies
+        run: pnpm audit --audit-level moderate
+        working-directory: typescript
+
+      - name: Lint
+        run: pnpm lint
+        working-directory: typescript
+
+      - name: Type Check
+        run: pnpm types:check
+        working-directory: typescript
+
+      - name: Build
+        run: pnpm build
+        working-directory: typescript
+
+      - name: Test Package
+        run: pnpm --filter wellformed-ts test
+        working-directory: typescript
+
+      - name: Smoke Test Package Tarball
+        run: pnpm test:package
+        working-directory: typescript
+
+      - name: Setup Node 18 for Package Runtime Smoke
+        uses: actions/setup-node@v4
+        with:
+          node-version: 18
+
+      - name: Smoke Test Package Tarball on Minimum Node
+        run: npm run test:package
+        working-directory: typescript/packages/wellformed

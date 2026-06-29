@@ -1,0 +1,181 @@
+---
+title: Comparison
+description: When to pick wellformed instead of JSON Schema, Zod, Yup, or Joi.
+---
+
+Use wellformed when validation has to leave JavaScript.
+
+Zod is great inside one TypeScript app. JSON Schema is great when ecosystem
+compatibility matters most. wellformed is for the middle: Zod-like authoring,
+portable JSON rules, and the same validation behavior in TypeScript and Rust.
+
+<Callout title="The shortest version">
+  If your schema needs to be stored, inspected, sent over the wire, or evaluated
+  outside JavaScript, use wellformed.
+</Callout>
+
+```text
+TypeScript builder
+      |
+      v
+Serializable JSON IR
+      |
+      +--> TypeScript validate()
+      |
+      +--> Rust validate()
+```
+
+## Pick The Tool
+
+| If you need... | Use |
+|---|---|
+| Form or API validation inside one TypeScript app, nothing leaving JS | Zod |
+| OpenAPI compatibility and broad ecosystem tooling | JSON Schema |
+| Shared TypeScript and Rust validation | **wellformed** |
+| Validation rules stored in a database or config service | **wellformed** |
+| SSN, EIN, IBAN, routing number, CUSIP, ICD-10, and similar predicates | **wellformed** |
+| Cross-field rules that remain inspectable data | **wellformed** |
+| Predicates, transforms, and cross-field checks without custom glue code | **wellformed** |
+| A legacy Node validation library | Yup / Joi |
+
+<Callout title="A note on speed">
+  Speed is not a reason to choose Zod over wellformed. In the same V8 runtime,
+  wellformed-ts validates 10 to 40x faster than Zod, and on par with Valibot.
+  The Rust runtime is faster still. See the [benchmark](/docs/performance).
+</Callout>
+
+## Why Developers Switch
+
+<Cards>
+  <Card title="Rules are data">
+    Schemas compile to JSON. Store them, diff them, sign them, and move them
+    across services.
+  </Card>
+  <Card title="One schema, two runtimes">
+    Author in TypeScript. Validate in TypeScript or Rust without rewriting the
+    rules.
+  </Card>
+  <Card title="Domain validators included">
+    Built-ins cover tax, finance, healthcare, IDs, URLs, dates, phones, and
+    more.
+  </Card>
+  <Card title="Less custom logic">
+    Common predicates, transforms, and cross-field checks are schema methods,
+    not one-off helper functions.
+  </Card>
+  <Card title="Logic stays inspectable">
+    Transforms, predicates, error codes, and cross-field rules stay visible in
+    the IR.
+  </Card>
+</Cards>
+
+## At A Glance
+
+| Capability | wellformed | JSON Schema | Zod | Yup / Joi |
+|---|---|---|---|---|
+| TypeScript builder | Yes | No | Yes | Yes |
+| Type inference | Yes | No | Yes | Limited |
+| Serializable schema | Yes | Yes | No | No |
+| TypeScript runtime | Yes | Yes | Yes | Yes |
+| Rust runtime | Yes | Via other validators | No | No |
+| First-class transforms | Yes | No | JS closures | JS callbacks |
+| Inspectable cross-field rules | Yes | Awkward | No | Limited |
+| Domain predicates | 60+ built-ins | Format only | Minimal | Minimal |
+| Custom code needed for rich form rules | Low | High | Medium | Medium |
+| Best fit | Portable validation | Standards and OpenAPI | TS-only apps | Legacy apps |
+
+## vs JSON Schema
+
+wellformed is inspired by JSON Schema's best idea: schemas should be portable
+data. It is not a JSON Schema implementation or dialect.
+
+JSON Schema wins when you need OpenAPI, editor integration, and validators in
+many languages.
+
+wellformed wins when you need behavior JSON Schema does not model cleanly:
+
+- transforms before validation, like `trim()` and `digitsOnly()`
+- domain predicates like `ssn()`, `ein()`, `iban()`, and `abaRouting()`
+- TypeScript inference from the authoring schema
+- cross-field business rules without deeply nested `allOf` / `if` / `then`
+
+```ts
+// wellformed: the rule is compact and serializable
+w.object({
+  type: w.enum(["individual", "business"] as const),
+  ssn: w.string().ssn().optional(),
+  ein: w.string().ein().optional(),
+})
+  .when("type").equals("individual").require("ssn")
+  .when("type").equals("business").require("ein");
+```
+
+## vs Zod
+
+Zod is excellent when everything runs in JavaScript.
+
+The problem starts when the schema needs to cross a runtime boundary. Zod
+schemas are JavaScript objects with closures. They cannot be serialized into a
+portable validation program.
+
+wellformed also cuts down the amount of custom validation code you write for
+forms with normalization, domain predicates, and business rules:
+
+```ts
+// Zod: JS-only transform
+z.string().transform((value) => value.replace(/\D/g, ""));
+
+// wellformed: serializable transform, also implemented in Rust
+w.string().digitsOnly();
+```
+
+```ts
+// wellformed: transform + predicate + cross-field rule, still serializable
+w.object({
+  kind: w.enum(["individual", "business"] as const),
+  ssn: w.string().digitsOnly().ssn().optional(),
+  ein: w.string().digitsOnly().ein().optional(),
+})
+  .when("kind").equals("individual").require("ssn")
+  .when("kind").equals("business").require("ein");
+```
+
+Use Zod if you want maximum TypeScript ecosystem compatibility and do not need
+serialization.
+
+Use wellformed if the same rule has to run in a browser, a Node service, and a
+Rust service without becoming three separate implementations.
+
+## vs Yup / Joi
+
+Yup and Joi are mature Node validation libraries. They work well in legacy
+codebases, but they do not solve the portability problem:
+
+- schemas are runtime objects, not portable JSON
+- TypeScript inference is weaker than wellformed or Zod
+- cross-field rules are harder to inspect
+- domain predicates usually become custom application code
+
+## Where wellformed Is Not The Right Fit
+
+- You need full JSON Schema or OpenAPI compatibility.
+- You need arbitrary JavaScript transforms inside the schema.
+- You only validate in one TypeScript app and already like Zod.
+- You need validators in many languages today, not TypeScript and Rust.
+
+## Next
+
+<Cards>
+  <Card title="Start in 60 seconds" href="/docs/getting-started">
+    Install the package and validate your first schema.
+  </Card>
+  <Card title="See performance" href="/docs/performance">
+    Compare wellformed, Valibot, Zod, Yup, and Rust validation.
+  </Card>
+  <Card title="Validate in Rust" href="/docs/rust-runtime">
+    Deserialize the same IR and validate submitted JSON in Rust.
+  </Card>
+  <Card title="Inspect the IR" href="/docs/ir-schema">
+    See what the portable schema format actually contains.
+  </Card>
+</Cards>

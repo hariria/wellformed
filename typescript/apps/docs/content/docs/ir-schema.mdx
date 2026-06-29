@@ -1,0 +1,322 @@
+---
+title: IR Schema
+description: Full IR reference — Schema, TypeSchema, Predicate types, Transform types
+---
+
+The wellformed Intermediate Representation (IR) is the portable JSON format emitted by the TypeScript builder and read by the runtimes.
+
+The TypeScript types match the Rust `wellformed` crate's serde serialization format exactly.
+
+<Callout title="You usually do not write this by hand">
+  Author schemas with the builder API. Inspect IR when you need storage,
+  auditing, Rust validation, codegen, or advanced tooling.
+</Callout>
+
+## Schema (Top-Level)
+
+```ts
+interface Schema {
+  version: string;
+  id?: string;
+  title?: string;
+  description?: string;
+  irs_form?: IrsFormMetadata;
+  pdf_template?: PdfTemplate;
+  import?: ImportConfig;
+  definitions?: Record<string, TypeSchema>;
+  sections?: Record<string, SectionDefinition>;
+  root: TypeSchema;
+}
+```
+
+## TypeSchema
+
+A discriminated union on the `type` field. The Rust crate uses `#[serde(tag = "type")]`:
+
+### Primitive Types
+
+```ts
+{ type: "string",  transforms?: Transform[], constraints?: Constraint[] }
+{ type: "number",  transforms?: Transform[], constraints?: Constraint[] }
+{ type: "integer", transforms?: Transform[], constraints?: Constraint[] }
+{ type: "boolean" }
+```
+
+### Fixed-Width Integers
+
+```ts
+{ type: "int32",  transforms?: Transform[], constraints?: Constraint[] }
+{ type: "int64",  transforms?: Transform[], constraints?: Constraint[] }
+{ type: "uint32", transforms?: Transform[], constraints?: Constraint[] }
+{ type: "uint64", transforms?: Transform[], constraints?: Constraint[] }
+```
+
+### Domain-Specific Numeric Types
+
+```ts
+{ type: "money",      scale?: number, transforms?: Transform[], constraints?: Constraint[] }
+{ type: "currency",   code?: string, scale?: number, transforms?: Transform[], constraints?: Constraint[] }
+{ type: "decimal",    precision?: number, scale?: number, transforms?: Transform[], constraints?: Constraint[] }
+{ type: "percentage", format?: "decimal" | "whole", allow_over_100?: boolean, scale?: number, transforms?: Transform[], constraints?: Constraint[] }
+```
+
+### Date
+
+```ts
+{ type: "date", format?: string, transforms?: Transform[], constraints?: Constraint[] }
+```
+
+### Object
+
+```ts
+{
+  type: "object",
+  properties?: Record<string, PropertySchema>,
+  additional_properties?: boolean,
+  unknown_keys?: "strict" | "passthrough" | "strip",
+  catchall?: TypeSchema,
+  rules?: Constraint[]
+}
+```
+
+`PropertySchema` is a `TypeSchema` flattened with an optional `required` field (defaults to `true`):
+
+```ts
+type PropertySchema = TypeSchema & { required?: boolean }
+```
+
+### Array
+
+```ts
+{
+  type: "array",
+  items: TypeSchema,
+  min_items?: number,
+  max_items?: number,
+  transforms?: Transform[],
+  constraints?: Constraint[]
+}
+```
+
+### Enum
+
+```ts
+{ type: "enum", values: unknown[] }
+```
+
+### Literal and Never
+
+```ts
+{ type: "literal", value: unknown }
+{ type: "never" }
+```
+
+### Tuple
+
+```ts
+{ type: "tuple", items: TypeSchema[] }
+```
+
+### Union
+
+```ts
+{ type: "union", oneOf: TypeSchema[], discriminator?: string }
+```
+
+### Intersection
+
+```ts
+{ type: "intersection", allOf: TypeSchema[] }
+```
+
+### Record
+
+```ts
+{ type: "record", value: TypeSchema, key?: TypeSchema, partial?: boolean }
+```
+
+### Preprocess and Catch
+
+```ts
+{ type: "preprocess", transforms?: Transform[], schema: TypeSchema }
+{ type: "catch", schema: TypeSchema, value: unknown }
+```
+
+### Reference and Any
+
+```ts
+{ type: "ref", $ref: string }
+{ type: "any" }
+```
+
+## Constraint
+
+Every validation rule is a `Constraint`:
+
+```ts
+interface Constraint {
+  id?: string;
+  pred: Predicate;
+  error: ErrorMeta;
+}
+
+interface ErrorMeta {
+  code: string;
+  message: string;
+  path?: string;
+  severity?: "error" | "warning";
+  help?: string;
+  source?: string;
+}
+```
+
+`error.message` is the custom message returned when `pred` fails. `code` should
+stay stable for application logic and localization; `message` can be changed as
+display copy.
+
+```json
+{
+  "pred": { "type": "min_len", "len": 1 },
+  "error": {
+    "code": "NAME_REQUIRED",
+    "message": "Name is required"
+  }
+}
+```
+
+## Predicate
+
+A discriminated union on the `type` field:
+
+### Constants
+
+```ts
+{ type: "true" }
+{ type: "false" }
+```
+
+### String/Array Predicates
+
+```ts
+{ type: "regex", pattern: string, flags?: string }
+{ type: "template_literal", parts: TemplateLiteralPart[] }
+{ type: "min_len", len: number }
+{ type: "max_len", len: number }
+```
+
+`TemplateLiteralPart` supports these part shapes:
+
+```ts
+{ kind: "literal", value: string }
+{ kind: "digits", min?: number, max?: number }
+{ kind: "ascii_letters", min?: number, max?: number }
+{ kind: "ascii_alphanumeric", min?: number, max?: number }
+{ kind: "uppercase", min?: number, max?: number }
+{ kind: "lowercase", min?: number, max?: number }
+{ kind: "hex", min?: number, max?: number }
+```
+
+### Numeric Predicate
+
+```ts
+{ type: "range", min?: number, max?: number }
+```
+
+### Path-Based Predicates
+
+```ts
+{ type: "exists", path: string }          // JSON Pointer
+{ type: "eq", path: string, value: any }
+{ type: "in", path: string, values: any[] }
+{ type: "required_with", field: string, with: string }
+{ type: "required_without", field: string, without: string }
+{ type: "exactly_one_of", paths: string[] }
+```
+
+### Cross-Field Comparisons
+
+```ts
+{ type: "eq_fields",  left: string, right: string }
+{ type: "gt_field",   left: string, right: string }
+{ type: "gte_field",  left: string, right: string }
+{ type: "lt_field",   left: string, right: string }
+{ type: "lte_field",  left: string, right: string }
+```
+
+### Computed Predicates
+
+```ts
+{ type: "sum_equals",       paths: string[], target: string }
+{ type: "sum_equals_value", paths: string[], value: number }
+```
+
+### Boolean Combinators
+
+```ts
+{ type: "and", predicates: Predicate[] }
+{ type: "or",  predicates: Predicate[] }
+{ type: "not", predicate: Predicate }
+{ type: "implies", if: Predicate, then: Predicate }
+```
+
+### Named Predicates
+
+```ts
+{ type: "call", name: string, args?: any }
+```
+
+Named predicates are resolved through the `PredicateRegistry` at evaluation time.
+
+## Transform
+
+Transforms are tagged on the `fn` field (Rust uses `#[serde(tag = "fn")]`):
+
+```ts
+{ fn: "trim" }
+{ fn: "collapse_whitespace" }
+{ fn: "digits_only" }
+{ fn: "upper" }
+{ fn: "lower" }
+{ fn: "money_to_cents", scale?: number }
+{ fn: "date_parse", format: string }
+{ fn: "replace", pattern: string, replacement: string }
+{ fn: "normalize_flight_number" }
+{ fn: "normalize_icd10" }
+{ fn: "normalize_cpt" }
+{ fn: "normalize_hcpcs" }
+{ fn: "normalize_ndc11" }
+{ fn: "default", value: any }
+{ fn: "phone_us" }
+{ fn: "phone_e164" }
+{ fn: "card_mask_last4" }
+{ fn: "format_ssn" }
+{ fn: "format_ein" }
+{ fn: "mask_ssn" }
+{ fn: "mask_ein" }
+{ fn: "format_iban" }
+{ fn: "format_credit_card" }
+{ fn: "format_thousands", separator?: string }
+{ fn: "format_decimal", places: number }
+```
+
+## Relationship to Rust Crate
+
+The TypeScript IR types are a direct mirror of the Rust `wellformed` crate's types:
+
+- `TypeSchema` corresponds to Rust's `TypeSchema` enum with `#[serde(tag = "type")]`
+- `PropertySchema` uses flattened serialization matching Rust's `#[serde(flatten)]`
+- `Predicate` corresponds to Rust's `Predicate` enum with `#[serde(tag = "type")]`
+- `Transform` corresponds to Rust's `Transform` enum with `#[serde(tag = "fn")]`
+- Object fields use `snake_case` to match Rust's `#[serde(rename_all = "snake_case")]`
+- Union variants use `oneOf` to match Rust's `#[serde(rename = "oneOf")]`
+- Intersection variants use `allOf` to match Rust's `#[serde(rename = "allOf")]`
+
+A schema serialized from TypeScript can be deserialized and evaluated by the Rust crate, and vice versa:
+
+```ts
+// TypeScript → JSON → Rust
+const json = schemaToJSON(schema);
+// Send to Rust backend, which deserializes with serde_json
+```
+
+Runtime support can lag behind the type surface for extension points. For `ref` schemas, both the TypeScript and Rust runtimes resolve names through top-level `definitions`; missing references and cycles should be treated as schema authoring errors and covered by compatibility tests.

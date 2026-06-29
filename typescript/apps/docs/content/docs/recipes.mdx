@@ -1,0 +1,187 @@
+---
+title: Recipes
+description: Copy-paste patterns for forms, APIs, Rust services, and cross-field rules.
+---
+
+Start here when you already know the job. Each recipe is the smallest useful
+shape.
+
+## Contact Form Schema
+
+```ts
+import { w, type Infer } from "wellformed-ts";
+
+export const Contact = w.object({
+  firstName: w.string().trim().minLen(1),
+  email: w.string().trim().lower().email(),
+  phone: w.string().phoneUS().optional(),
+}).strict();
+
+export type Contact = Infer<typeof Contact>;
+export const contactSchema = Contact.toSchema("1.0");
+```
+
+Use `Contact` while authoring and `contactSchema` anywhere validation happens.
+
+## Validate Unknown Input
+
+```ts
+import type { Schema } from "wellformed-ts/ir";
+import { validate } from "wellformed-ts/runtime";
+import type { Contact } from "./contact";
+
+export function parseContact(schema: Schema, input: unknown) {
+  const result = validate(schema, input);
+  if (!result.valid) {
+    return { ok: false as const, errors: result.errors };
+  }
+
+  return { ok: true as const, value: result.value as Contact };
+}
+```
+
+Use `result.value`. It contains trimmed, lowercased, defaulted, and stripped
+output.
+
+## Cross-Field Business Rule
+
+```ts
+const Taxpayer = w.object({
+  kind: w.enum(["individual", "business"] as const),
+  ssn: w.string().digitsOnly().ssn().optional(),
+  ein: w.string().digitsOnly().ein().optional(),
+})
+  .strict()
+  .when("kind").equals("individual").require("ssn")
+  .when("kind").equals("business").require("ein")
+  .mutuallyExclusive("ssn", "ein");
+```
+
+The rule serializes with the schema. No hidden `.refine()` closure.
+
+## Store Or Transmit A Schema
+
+```ts
+import { parseSchema, schemaToJSON } from "wellformed-ts/serialize";
+
+const json = schemaToJSON(contactSchema, true);
+const restored = parseSchema(json);
+```
+
+Store your own app schema id and version beside the wellformed IR.
+
+```json
+{
+  "schema_id": "contact",
+  "schema_version": 3,
+  "wellformed_ir": {}
+}
+```
+
+## React Hook Form Resolver
+
+```ts
+import type { Resolver } from "react-hook-form";
+import type { Schema } from "wellformed-ts/ir";
+import { validate } from "wellformed-ts/runtime";
+
+export function wellformedResolver(schema: Schema): Resolver {
+  return async (values) => {
+    const result = validate(schema, values);
+    if (result.valid) {
+      return { values: result.value as Record<string, unknown>, errors: {} };
+    }
+
+    return {
+      values: {},
+      errors: Object.fromEntries(
+        result.errors.map((error) => [
+          error.path.replace(/^\//, "").replace(/\//g, "."),
+          { type: error.code, message: error.message },
+        ]),
+      ),
+    };
+  };
+}
+```
+
+Use stable error `code` values for UI logic and localization.
+
+## Rust Embedded Schema
+
+```rust
+use serde_json::json;
+use wellformed_macros::wellformed;
+
+const CONTACT: wellformed::EmbeddedSchema = wellformed!("schemas/contact.json");
+
+fn validate_contact() -> wellformed::Result<()> {
+    let (result, value) = CONTACT.validate_json(r#"{
+      "firstName": " Ada ",
+      "email": "ADA@EXAMPLE.COM"
+    }"#)?;
+
+    assert!(result.is_valid());
+    assert_eq!(value["firstName"], json!("Ada"));
+    assert_eq!(value["email"], json!("ada@example.com"));
+
+    Ok(())
+}
+```
+
+Use this when Rust validates the same JSON IR but does not need generated
+structs.
+
+## Axum Boundary
+
+```rust
+use axum::{extract::State, http::StatusCode, Json};
+use serde_json::{json, Value};
+
+type ApiError = (StatusCode, Json<Value>);
+
+async fn create_contact(
+    State(state): State<AppState>,
+    Json(mut body): Json<Value>,
+) -> Result<Json<Contact>, ApiError> {
+    let result = wellformed::validate(&state.contact_schema, &mut body).map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error.to_string() })),
+        )
+    })?;
+
+    if !result.is_valid() {
+        return Err((
+            StatusCode::UNPROCESSABLE_ENTITY,
+            Json(json!({ "errors": result.errors })),
+        ));
+    }
+
+    let contact = serde_json::from_value(body).map_err(|error| {
+        (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error.to_string() })),
+        )
+    })?;
+
+    Ok(Json(contact))
+}
+```
+
+Validate `serde_json::Value` first, then deserialize into your Rust type. See
+[Axum](/docs/axum) for the complete handler.
+
+## Next
+
+<Cards>
+  <Card title="Builder strings" href="/docs/builder/strings">
+    Email, phone, SSN, IBAN, UUID, URL, and normalization methods.
+  </Card>
+  <Card title="Validation result" href="/docs/validation">
+    `result.valid`, `result.errors`, and transformed `result.value`.
+  </Card>
+  <Card title="Rust runtime" href="/docs/rust-runtime">
+    Load serialized IR and validate arbitrary JSON in Rust.
+  </Card>
+</Cards>

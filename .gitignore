@@ -1,0 +1,21 @@
+target/
+node_modules/
+.DS_Store
+*.swp
+*.swo
+.env
+.env*.local
+dist/
+.turbo
+.next/
+.source
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+package-lock.json
+
+# Local one-off helpers
+compress.sh
+
+.idea/
+.claude/

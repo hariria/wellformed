@@ -1,0 +1,78 @@
+---
+title: Arrays
+description: ArrayBuilder — item types, length constraints
+---
+
+`w.array()` creates schemas for arrays with typed items.
+
+## Basic Usage
+
+Pass the item schema to `w.array()`:
+
+```ts
+const names = w.array(w.string());
+// string[]
+
+const numbers = w.array(w.integer().min(0));
+// number[]
+```
+
+## Length Constraints
+
+```ts
+w.array(w.string()).minItems(1)      // At least 1 item
+w.array(w.string()).maxItems(10)     // At most 10 items
+w.array(w.string()).length(3)        // Exactly 3 items
+w.array(w.string()).nonEmpty()       // Shorthand for minItems(1)
+```
+
+## Nested Objects
+
+Arrays can contain any schema type:
+
+```ts
+const lineItems = w.array(
+  w.object({
+    description: w.string().minLen(1),
+    amount: w.money().nonNegative(),
+    quantity: w.integer().positive(),
+  })
+).nonEmpty();
+```
+
+## Nested Arrays
+
+```ts
+const matrix = w.array(w.array(w.number()));
+// number[][]
+```
+
+## Type Inference
+
+```ts
+import type { Infer } from "wellformed-ts";
+
+const schema = w.array(
+  w.object({
+    name: w.string(),
+    score: w.number(),
+  })
+);
+
+type T = Infer<typeof schema>;
+// { name: string; score: number }[]
+```
+
+## Validation
+
+Each item in the array is validated against the item schema. Errors include the item index in the path:
+
+```ts
+import { validate } from "wellformed-ts";
+
+const schema = w.array(w.string().minLen(1)).toSchema("1.0");
+const result = validate(schema, ["hello", ""]);
+
+console.log(result.errors);
+// [{ path: "/1", code: "TOO_SHORT", message: "Must be at least 1 characters" }]
+```

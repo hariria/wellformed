@@ -1,0 +1,147 @@
+---
+title: Type Inference
+description: Infer, InferInput, InferOutput, Simplify, and optional inference
+---
+
+wellformed provides Zod-like type inference, extracting TypeScript types directly from your schema definitions.
+
+## Infer
+
+The primary inference utility type:
+
+```ts
+import { w, type Infer } from "wellformed-ts";
+
+const schema = w.object({
+  name: w.string(),
+  age: w.integer(),
+  email: w.string().email(),
+});
+
+type User = Infer<typeof schema>;
+// { name: string; age: number; email: string }
+```
+
+## Type Mapping
+
+| Builder | Inferred Type |
+|---------|--------------|
+| `w.string()` | `string` |
+| `w.number()` | `number` |
+| `w.integer()` | `number` |
+| `w.int32()` / `w.int64()` | `number` |
+| `w.uint32()` / `w.uint64()` | `number` |
+| `w.money()` | `number` |
+| `w.currency()` | `number` |
+| `w.decimal()` | `number` |
+| `w.percentage()` | `number` |
+| `w.date()` | `string` |
+| `w.boolean()` | `boolean` |
+| `w.enum(["a", "b"] as const)` | `"a" \| "b"` |
+| `w.array(T)` | `Infer<T>[]` |
+| `w.object({...})` | `{ ... }` |
+| `w.union([A, B])` | `Infer<A> \| Infer<B>` |
+
+## Optional Fields
+
+Fields marked with `.optional()` become optional properties:
+
+```ts
+const schema = w.object({
+  name: w.string(),
+  nickname: w.string().optional(),
+});
+
+type T = Infer<typeof schema>;
+// { name: string; nickname?: string | undefined }
+```
+
+The `optional()` helper function works the same way:
+
+```ts
+import { w, optional, type Infer } from "wellformed-ts";
+
+const schema = w.object({
+  name: w.string(),
+  nickname: optional(w.string()),
+});
+
+type T = Infer<typeof schema>;
+// { name: string; nickname?: string | undefined }
+```
+
+## Nested Inference
+
+Inference works recursively through nested structures:
+
+```ts
+const addressSchema = w.object({
+  street: w.string(),
+  city: w.string(),
+  state: w.string().usState(),
+  zip: w.string().usZip(),
+});
+
+const userSchema = w.object({
+  name: w.string(),
+  address: addressSchema,
+  tags: w.array(w.string()),
+  roles: w.array(w.enum(["admin", "user"] as const)),
+});
+
+type User = Infer<typeof userSchema>;
+// {
+//   name: string;
+//   address: { street: string; city: string; state: string; zip: string };
+//   tags: string[];
+//   roles: ("admin" | "user")[];
+// }
+```
+
+## InferInput and InferOutput
+
+For symmetry with Zod:
+
+```ts
+import type { InferInput, InferOutput } from "wellformed-ts";
+
+type Input = InferInput<typeof schema>;   // Same as Infer
+type Output = InferOutput<typeof schema>; // Same as Infer
+```
+
+Currently `InferInput` and `InferOutput` are identical to `Infer`. If transforms that change types are added in the future (e.g., a transform that converts a string to a number), these types will diverge.
+
+## Simplify
+
+The `Simplify` helper flattens intersection types for better IDE display:
+
+```ts
+import type { Simplify } from "wellformed-ts";
+
+type A = { name: string } & { age: number };
+// IDE shows: { name: string } & { age: number }
+
+type B = Simplify<A>;
+// IDE shows: { name: string; age: number }
+```
+
+This is used internally by the inference system and exported for your use.
+
+## Composition Preserves Types
+
+All object composition methods maintain type inference:
+
+```ts
+const base = w.object({ id: w.string() });
+const extended = base.extend({ name: w.string() });
+type Extended = Infer<typeof extended>;
+// { id: string; name: string }
+
+const picked = extended.pick("name");
+type Picked = Infer<typeof picked>;
+// { name: string }
+
+const partial = extended.partial();
+type Partial = Infer<typeof partial>;
+// { id?: string; name?: string }
+```

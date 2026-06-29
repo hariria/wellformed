@@ -1,0 +1,130 @@
+---
+title: FAQ
+description: Answers to the questions engineers ask about portable validation, from predicate availability and cross-runtime parity to type inference and async checks.
+---
+
+The questions that come up once validation rules are data that outlive your
+code.
+
+## What happens if a schema uses a predicate the runtime doesn't have?
+
+It fails loudly. A missing predicate is a schema error, not a silent pass and
+not a per-field validation failure. In TypeScript, `validate()` throws
+(`Unknown predicate: <name>`). In Rust it returns `Err(WelError::UnknownPredicate)`.
+The distinction matters: a value that breaks its rules comes back in
+`result.errors`, while a schema the runtime cannot understand fails the whole
+call.
+
+The consequence for stored rules: **adding** predicates is backward compatible
+(old schemas keep working), but **renaming or removing** one breaks any stored
+schema that used it. So keep the built-in set additive, pin a schema `version`,
+and register any custom predicate in every runtime that evaluates the schema.
+See [Predicate Evolution](/docs/predicates#predicate-evolution).
+
+## Do TypeScript and Rust really validate identically?
+
+That is the goal, and for the built-in predicates they are implemented to the
+same definitions in both runtimes. Two honest caveats:
+
+- **Raw regex differs by design.** TypeScript uses the JavaScript `RegExp`
+  engine; Rust uses the `regex` crate, which does not support lookaround or
+  backreferences. A pattern that relies on those validates in TypeScript and
+  will not even compile in Rust. When you need a cross-runtime guarantee, prefer
+  the built-in domain predicates (`ssn()`, `iban()`, ...) and `templateLiteral()`
+  over hand-rolled regex. If you do reach for `.regex()`, stick to the portable
+  subset (no lookahead, lookbehind, or backreferences).
+- **There is not yet a shared conformance suite.** Each runtime has its own
+  tests. If exact parity is load-bearing for you, lean on the built-in
+  predicates, which are the controlled, hand-written path, rather than
+  runtime-specific features.
+
+## Do I get TypeScript types from a schema loaded at runtime?
+
+No. `Infer<typeof schema>` is a compile-time, type-level feature: it needs the
+schema written as a TypeScript value so the compiler can read it. A schema you
+parse from JSON at runtime (the dynamic-forms case) is just a `Schema`, and
+`validate()` gives you a checked value, not a static type.
+
+```ts
+// Authored in TypeScript: full static type.
+const User = w.object({ email: w.string().email() });
+type User = Infer<typeof User>; // { email: string }
+
+// Loaded from JSON at runtime: validated, but not statically typed.
+const schema = parseSchema(row.schema); // type: Schema
+const result = validate(schema, input);
+if (result.valid) {
+  result.value; // you declare or assert the shape
+}
+```
+
+So you get static inference when you author in TypeScript, and runtime validation
+when the schema is data. Both are useful; they just do not overlap.
+
+## Can a predicate be async, or look at external data?
+
+Not today. Validation is synchronous and pure: a predicate sees the value (and,
+for cross-field rules, its sibling fields), but it cannot await, query a
+database, or read outside context. So "is this a valid email format" is in
+scope; "is this email already taken" is not.
+
+Checks that need IO or application state belong in your app, after wellformed has
+validated shape and format. This is a property of the current IR, not a hard
+limit of the approach. A future revision of the IR could model contextual or
+async predicates; for now, keep validation deterministic and do business checks
+separately.
+
+## Do transforms mutate my input?
+
+In Rust, `validate` mutates the `serde_json::Value` in place when transforms run,
+so keep a copy of the raw input if you need both. In TypeScript, `validate`
+returns the transformed value as `result.value` and leaves your input alone.
+
+## Should I parse the schema on every request?
+
+No. Parse the IR once with `parseSchema` and reuse the result. Parsing is cheap,
+but it is not free, and there is no reason to redo it per request.
+
+## How do I localize error messages?
+
+Build on the `code`, not the message. Every constraint carries a stable,
+machine-readable `code` (`INVALID_SSN`, `EIN_REQUIRED`); messages are display
+text you can override or map to your own translations. Treat codes as API and
+messages as presentation. See
+[Treat Error Codes as API](/docs/production#treat-error-codes-as-api).
+
+## How do I version and migrate stored schemas?
+
+Store the schema `version` with each record and migrate explicitly. See
+[Version Schemas Explicitly](/docs/production#version-schemas-explicitly) and
+[Runtime Compatibility](/docs/production#runtime-compatibility).
+
+## Why not JSON Schema, or Zod?
+
+See [Comparison](/docs/comparison) for the full picture. Short version: JSON
+Schema describes shape but not transforms, domain predicates, or cross-field
+rules; Zod is great when everything stays in one TypeScript app. wellformed is
+for portable rules that have to run in more than one place.
+
+## Why only TypeScript and Rust?
+
+Those are the two runtimes today. The IR is the point: any language can implement
+a runtime against the same JSON, so more may follow. If you want to build one,
+the [IR Schema](/docs/ir-schema) reference is where to start.
+
+## Next
+
+<Cards>
+  <Card title="Predicate Evolution" href="/docs/predicates#predicate-evolution">
+    How the predicate set changes over time without breaking stored schemas.
+  </Card>
+  <Card title="Production Notes" href="/docs/production">
+    Versioning, error codes, unknown-key policy, and runtime compatibility.
+  </Card>
+  <Card title="Comparison" href="/docs/comparison">
+    wellformed versus Zod, JSON Schema, Yup, and Joi.
+  </Card>
+  <Card title="IR Schema" href="/docs/ir-schema">
+    The portable format any runtime reads.
+  </Card>
+</Cards>

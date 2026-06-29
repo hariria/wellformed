@@ -1,0 +1,242 @@
+---
+title: Strings
+description: StringBuilder — transforms, constraints, and domain predicates
+---
+
+Create string schemas with `w.string()`. The `StringBuilder` supports transforms, length constraints, regex and template-literal patterns, text character classes, and domain-specific validators.
+
+## Transforms
+
+Transforms normalize the value **before** validation. They run in the order you chain them.
+
+```ts
+w.string().trim()               // Remove leading/trailing whitespace
+w.string().collapseWhitespace() // Multiple spaces → single space + trim
+w.string().digitsOnly()         // Strip all non-digit characters
+w.string().upper()              // Convert to UPPERCASE
+w.string().lower()              // Convert to lowercase
+w.string().replace("foo", "bar") // Replace every "foo" with "bar" (literal substring)
+w.string().default("N/A")      // Use "N/A" if value is null/undefined
+w.string().formatThousands()    // Format numeric text with thousands separators
+w.string().formatDecimal(2)     // Format numeric text to two decimal places
+```
+
+Transforms compose naturally:
+
+```ts
+// Normalize a SSN: strip formatting, then validate
+w.string().digitsOnly().ssn()
+```
+
+## Length Constraints
+
+```ts
+w.string().minLen(1)       // At least 1 character
+w.string().maxLen(100)     // At most 100 characters
+w.string().length(9)       // Exactly 9 characters (minLen + maxLen)
+w.string().nonEmpty()      // Shorthand for minLen(1)
+```
+
+## Regex
+
+```ts
+w.string().regex("^[A-Z]{2}$")                     // Pattern match
+w.string().regex("^hello", { flags: "i" })          // Case-insensitive
+w.string().regex("^\\d+$", { message: "Digits only" }) // Custom message
+```
+
+## Template Literals
+
+Use `templateLiteral(...)` for structured strings that can be described with literal and character-class parts. The result is still serializable IR:
+
+```ts
+w.string().templateLiteral([
+  { kind: "literal", value: "SFO-" },
+  { kind: "digits", min: 3, max: 4 },
+  { kind: "literal", value: "-" },
+  { kind: "uppercase", min: 2, max: 2 },
+]);
+```
+
+## Prefix, Suffix, and Contains
+
+```ts
+w.string().startsWith("acct_")
+w.string().endsWith(".csv")
+w.string().includes("@")
+```
+
+## Text Character Classes
+
+These validators operate on ASCII character classes:
+
+```ts
+w.string().alpha()                // A-Z and a-z only
+w.string().digits()               // 0-9 only
+w.string().alphanumeric()         // A-Z, a-z, and 0-9 only
+w.string().alphaSpaces()          // Letters and spaces, at least one letter
+w.string().alphanumericSpaces()   // Letters, digits, and spaces
+w.string().nameChars()            // Letters, hyphens, and apostrophes
+w.string().uppercase()            // A-Z only
+w.string().lowercase()            // a-z only
+w.string().titleCase()            // "Alice", not "alice" or "ALICE"
+```
+
+## TIN Predicates
+
+Validate US taxpayer identification numbers:
+
+```ts
+w.string().tin()   // Any TIN (SSN, EIN, ITIN, or ATIN)
+w.string().ssn()   // Social Security Number (XXX-XX-XXXX)
+w.string().ein()   // Employer Identification Number (XX-XXXXXXX)
+w.string().itin()  // Individual Taxpayer Identification Number
+w.string().atin()  // Adoption Taxpayer Identification Number
+w.string().luhn()  // Luhn checksum (credit cards, etc.)
+```
+
+All TIN validators accept formatted (with hyphens) or raw digits. They validate structural rules like area/group/serial for SSNs and campus prefixes for EINs.
+
+## Financial Predicates
+
+```ts
+w.string().cusip()                          // CUSIP with checksum validation
+w.string().cusip({ validateChecksum: false }) // Skip checksum
+w.string().abaRouting()                     // ABA routing number (9 digits + checksum)
+w.string().mcc()                            // Merchant Category Code (4 digits)
+w.string().accountNumber()                  // Alphanumeric account number
+w.string().accountNumber({ minLen: 5, maxLen: 17, allowHyphens: false })
+w.string().creditCard()                     // Card number with Luhn validation
+w.string().cvv()                            // CVV/CVC
+w.string().cardExpiry()                     // Expiry date
+w.string().iban()                           // International Bank Account Number
+w.string().bic()                            // BIC
+w.string().swift()                          // SWIFT alias
+w.string().vin()                            // Vehicle Identification Number
+w.string().upc()                            // UPC
+w.string().ean()                            // EAN
+w.string().isbn()                           // ISBN
+```
+
+Formatting and masking transforms are separate from validation:
+
+```ts
+w.string().digitsOnly().formatCreditCard()
+w.string().digitsOnly().maskCardNumber()
+w.string().formatIban()
+```
+
+## Contact Predicates
+
+```ts
+w.string().email()                                    // Email address
+w.string().phone()                                    // US or international phone number
+w.string().phoneUS()                                  // US phone numbers only
+w.string().phone({ requireAreaCode: false })          // allow 7-digit US numbers (no area code)
+w.string().formatPhoneUS()                            // Format as (XXX) XXX-XXXX
+w.string().formatPhoneE164()                          // Normalize to E.164 when possible
+w.string().url()                                      // URL
+w.string().uuid()                                     // UUID
+w.string().ip()                                       // IPv4 or IPv6
+w.string().cidr()                                     // CIDR range
+w.string().macAddress()                               // MAC address
+```
+
+## Date Predicates (on strings)
+
+When dates are represented as strings, you can validate and compare them:
+
+```ts
+w.string().date()                           // Valid date string
+w.string().dateInRange({ minYear: 2020, maxYear: 2030 })
+w.string().dateInRange({ min: "2024-01-01", max: "2024-12-31" })
+w.string().dateBefore("2025-01-01")
+w.string().dateAfter("2020-01-01", { allowEqual: true })
+w.string().time()                           // Time string
+w.string().timeBefore("17:00")
+w.string().timeAfter("09:00")
+w.string().timeInRange({ min: "09:00", max: "17:00" })
+w.string().isoDatetime()                    // ISO 8601 datetime
+```
+
+## Reference Predicates
+
+```ts
+w.string().countryCode()                     // ISO 3166-1 alpha-2
+w.string().countryCode({ excludeUs: true })  // Non-US countries only
+w.string().currencyCode()                    // ISO 4217
+w.string().usState()                         // US state/territory code
+w.string().usZip()                           // 5 or 9 digit ZIP
+w.string().streetAddress()                   // Basic street-address shape
+w.string().w2Box12Code()                     // W-2 Box 12 letter codes
+w.string().code1099B()                       // 1099-B codes
+w.string().code1099B({ codeType: "term" })   // Specific code type
+```
+
+## Aviation, Healthcare, and Other Domains
+
+```ts
+w.string().iataAirportCode()
+w.string().icaoAirportCode()
+w.string().airportCode()
+w.string().iataAirlineCode()
+w.string().icaoAirlineCode()
+w.string().airlineCode()
+w.string().flightNumber()
+
+w.string().npi()
+w.string().deaNumber()
+w.string().icd10Code()
+w.string().cptCode()
+w.string().hcpcsCode()
+w.string().ndcCode()
+
+w.string().hexColor()
+w.string().rgbColor()
+w.string().hslColor()
+w.string().base58()
+w.string().base64()
+w.string().bitcoinAddress()
+w.string().ethereumAddress()
+w.string().solanaAddress()
+w.string().jwt()
+w.string().hash()
+```
+
+Normalization transforms are available for several code families:
+
+```ts
+w.string().normalizeFlightNumber()
+w.string().normalizeIcd10()
+w.string().normalizeCpt()
+w.string().normalizeHcpcs()
+w.string().normalizeNdc11()
+```
+
+## Custom Error Messages
+
+Every constraint accepts a `message` option:
+
+```ts
+w.string().minLen(1, { message: "Name is required" })
+w.string().email({ message: "Please enter a valid email" })
+w.string().ssn({ message: "Enter a valid 9-digit SSN" })
+```
+
+You can also set `code`, `help`, `source`, and `id`:
+
+```ts
+w.string().ein({
+  code: "INVALID_EIN",
+  message: "Invalid EIN format",
+  help: "EIN should be in XX-XXXXXXX format",
+})
+```
+
+## Optional Strings
+
+```ts
+w.string().optional()  // Value can be undefined
+```
+
+Use `.nullable()` to allow `null`, or `.nullish()` to allow both `null` and `undefined` in object contexts.

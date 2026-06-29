@@ -1,0 +1,275 @@
+---
+title: Validation
+description: validate(), validateOrThrow(), ValidationResult, and ValidateOptions
+---
+
+Most code calls `validate(...)`, checks `result.valid`, and uses
+`result.value`. `result.value` is the normalized output after transforms.
+
+<Callout title="Do not ignore result.value">
+  If a schema trims, lowercases, strips unknown keys, or fills defaults, the
+  validated value is different from the original input.
+</Callout>
+
+## validate()
+
+The primary validation function:
+
+```ts
+import { validate } from "wellformed-ts";
+
+const result = validate(schema, data);
+```
+
+Accepts either a full `Schema` (with `version` and `root`) or a raw `TypeSchema`:
+
+```ts
+// From a builder
+const schema = w.object({ name: w.string() }).toSchema("1.0");
+const result = validate(schema, { name: "Alice" });
+
+// Or validate against a raw type schema
+const typeSchema = w.string().email().toTypeSchema();
+const result2 = validate(typeSchema, "alice@example.com");
+```
+
+## ValidationResult
+
+`validate()` returns a `ValidationResult`:
+
+```ts
+interface ValidationResult {
+  valid: boolean;        // true if no errors
+  errors: FormError[];   // Validation errors (severity: "error")
+  warnings: FormError[]; // Validation warnings (severity: "warning")
+  value: unknown;        // The value after transforms
+}
+```
+
+Each `FormError` contains:
+
+```ts
+interface FormError {
+  code: string;          // Machine-readable error code (e.g., "REQUIRED", "INVALID_EMAIL")
+  message: string;       // Human-readable message
+  path: string;          // JSON Pointer to the field (e.g., "/name", "/address/city")
+  severity: "error" | "warning";
+  help?: string;         // Optional help text
+  source?: string;       // Optional source identifier
+}
+```
+
+### Example
+
+```ts
+const schema = w.object({
+  name: w.string().trim().minLen(1),
+  email: w.string().email(),
+  age: w.integer().min(0).max(150),
+}).toSchema("1.0");
+
+const result = validate(schema, {
+  name: "",
+  email: "not-an-email",
+  age: -5,
+});
+
+console.log(result.valid); // false
+console.log(result.errors);
+// [
+//   { path: "/name", code: "TOO_SHORT", message: "Must be at least 1 characters", severity: "error" },
+//   { path: "/email", code: "INVALID_EMAIL", message: "Invalid email address", severity: "error" },
+//   { path: "/age", code: "OUT_OF_RANGE", message: "Must be >= 0", severity: "error" },
+// ]
+```
+
+## Custom Error Messages
+
+Yes. Every constraint has error metadata in the IR. The runtime returns that
+message when the predicate fails.
+
+Builder API:
+
+```ts
+const schema = w.object({
+  email: w.string().email({
+    code: "CONTACT_EMAIL_INVALID",
+    message: "Enter a valid email address",
+    help: "Use a format like name@example.com",
+  }),
+});
+```
+
+Equivalent IR shape:
+
+```json
+{
+  "type": "string",
+  "constraints": [
+    {
+      "pred": { "type": "call", "name": "is_email" },
+      "error": {
+        "code": "CONTACT_EMAIL_INVALID",
+        "message": "Enter a valid email address",
+        "help": "Use a format like name@example.com"
+      }
+    }
+  ]
+}
+```
+
+Use stable `code` values for application logic and localization. Treat
+`message` as display copy.
+
+## validateOrThrow()
+
+Throws a `ValidationError` if validation fails:
+
+```ts
+import { validateOrThrow, ValidationError } from "wellformed-ts";
+
+try {
+  const value = validateOrThrow(schema, data);
+  // value is the transformed result
+} catch (e) {
+  if (e instanceof ValidationError) {
+    console.log(e.message); // "path: message; path: message"
+    console.log(e.errors);  // FormError[]
+  }
+}
+```
+
+## ValidateOptions
+
+Both functions accept an options object:
+
+```ts
+interface ValidateOptions {
+  context?: EvalContext;      // Custom predicate registry
+  applyTransforms?: boolean;  // Apply transforms (default: true)
+  collectAll?: boolean;       // Reserved; the current runtime collects all errors
+}
+```
+
+The TypeScript runtime currently collects all validation errors. `collectAll` is kept in the public options type for compatibility with planned stop-at-first behavior, but changing it does not alter execution today.
+
+### Disabling Transforms
+
+```ts
+const result = validate(schema, data, { applyTransforms: false });
+// Transforms like trim(), upper() won't be applied
+```
+
+### Custom Predicates
+
+`validate(schema, data)` already includes built-in predicates. Create a registry
+only when the schema uses app-specific predicate names.
+
+```ts
+import { createEvalContext, PredicateRegistry } from "wellformed-ts";
+
+const registry = PredicateRegistry.withBuiltins();
+registry.register("is_even", (value) => typeof value === "number" && value % 2 === 0);
+
+const ctx = createEvalContext(registry);
+const result = validate(schema, data, { context: ctx });
+```
+
+Use `withBuiltins()` when adding custom predicates so built-ins such as
+`is_email` and `is_uuid` still resolve. `new PredicateRegistry()` starts empty.
+
+## Execution Model
+
+Validation is a **single-pass recursive tree walk** over the schema. There is no dependency graph, topological sort, or scheduling — the schema is a tree by construction, and the validator walks it depth-first.
+
+### Ordering Guarantees
+
+For each node in the schema tree, the execution order is:
+
+1. **Transforms** — normalize the value (trim, uppercase, digits-only, etc.)
+2. **Type check** — verify the transformed value matches the expected type
+3. **Constraints** — evaluate predicates against the transformed value
+4. **Children** — recurse into nested schemas (object properties, array items)
+
+For **objects** specifically, the full sequence is:
+
+1. Check that the value is an object
+2. Iterate properties in definition order — for each property:
+   - Check required/optional
+   - Recursively validate the property value (transforms, type check, constraints, and its own children)
+3. After **all** properties are validated, evaluate cross-field `rules` against the result object
+
+This means cross-field rules like `requireSum` or `when().equals().require()` always see fully transformed property values. If `ssn` has a `digitsOnly()` transform, a cross-field rule reading `/ssn` will see the stripped digits, not the raw input.
+
+### Why Cycles Are Impossible
+
+The tree walk has no cycle detection because cycles cannot occur. The builder API uses JavaScript's eager evaluation — `w.object()` receives already-constructed builder instances, so you cannot pass a builder into its own shape:
+
+```ts
+// This is impossible: `user` doesn't exist yet when w.object() is called
+const user = w.object({
+  name: w.string(),
+  friend: user, // ReferenceError
+});
+```
+
+Every builder call creates a new instance, and the parent always outlives its children. The resulting schema tree is acyclic by construction.
+
+The IR includes a `ref` type (`{ type: "ref", $ref: string }`) for reusable definitions. This is the one mechanism that *could* introduce cycles in a deserialized schema (e.g., `A` references `B` which references `A`). The TypeScript runtime resolves references through top-level `definitions` and reports `REF_NOT_FOUND` or `REF_CYCLE` instead of accepting unvalidated values.
+
+### No Inter-Field Dependencies
+
+Fields do not depend on each other's validation outcomes. Cross-field rules read **values**, not validation results. There is no way to express "validate field B only if field A passed validation." Every field is validated unconditionally, and all errors are collected.
+
+### Union Strategy
+
+Unions try each variant in sequence, validating the entire value against each variant's schema. The first variant that produces zero errors wins. Errors from failed variants are discarded.
+
+The `discriminator` field exists in the IR as a hint for runtimes that want to optimize this (check one field first, skip non-matching variants), but the TypeScript runtime currently tries all variants regardless.
+
+### Performance
+
+The tree walk is O(n) where n is the total number of fields and values. There are no extra allocations for scheduling or dependency resolution. Named predicates are resolved via `Map.get()` (O(1)), and regex patterns are cached in the `EvalContext` to avoid recompilation.
+See [Performance](/docs/performance) for benchmark methodology and the current latency snapshot.
+
+## Nested Validation
+
+Object properties and array items are validated recursively. Error paths use JSON Pointer notation:
+
+```ts
+const schema = w.object({
+  address: w.object({
+    city: w.string().minLen(1),
+    state: w.string().usState(),
+  }),
+  contacts: w.array(w.object({
+    email: w.string().email(),
+  })),
+}).toSchema("1.0");
+
+const result = validate(schema, {
+  address: { city: "", state: "XX" },
+  contacts: [{ email: "bad" }, { email: "good@test.com" }],
+});
+
+// Error paths: "/address/city", "/address/state", "/contacts/0/email"
+```
+
+## Transforms in Validation
+
+Transforms run **before** constraint evaluation. The `result.value` contains the transformed data:
+
+```ts
+const schema = w.object({
+  name: w.string().trim().upper(),
+  ssn: w.string().digitsOnly().ssn(),
+}).toSchema("1.0");
+
+const result = validate(schema, {
+  name: "  alice  ",
+  ssn: "123-45-6789",
+});
+
+console.log(result.value);
+// { name: "ALICE", ssn: "123456789" }
+```

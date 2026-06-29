@@ -1,0 +1,174 @@
+---
+title: Cross-Field Rules
+description: Conditional requirements, mutual exclusion, field comparisons, and sum validation
+---
+
+Object schemas support rules that validate relationships **between** fields. These go beyond single-field constraints and express business logic like "if field A has value X, then field B is required."
+
+## Fluent Conditional API
+
+The `.when()` method starts a fluent chain:
+
+```ts
+const schema = w.object({
+  type: w.enum(["individual", "business"] as const),
+  ssn: w.string().ssn().optional(),
+  ein: w.string().ein().optional(),
+})
+  .when("type").equals("individual").require("ssn")
+  .when("type").equals("business").require("ein");
+```
+
+### Condition Methods
+
+Start a condition chain with `.when(field)`:
+
+```ts
+.when("field").equals(value)      // Field equals a specific value
+.when("field").in([v1, v2, v3])   // Field is one of several values
+.when("field").exists()           // Field is not null/undefined
+.when("field").notExists()        // Field is null/undefined
+.when("field").notEquals(value)   // Field does not equal a value
+.when("field").gte(number)        // Field >= number
+.when("field").lte(number)        // Field <= number
+```
+
+### Consequent Methods
+
+After the condition, specify what must be true:
+
+```ts
+.require("field")                                    // Field must exist
+.requireEquals("field", value)                       // Field must equal a value
+.requireIn("field", [v1, v2])                        // Field must be one of values
+.requireMatch("field", /^\d+$/)                      // Field must match regex
+.requirePredicate(predicate, code, message)           // Custom predicate
+.forbid("field")                                     // Field must NOT exist
+```
+
+### Composing Conditions
+
+Chain conditions with `.and()` or `.or()`:
+
+```ts
+schema
+  .when("country").equals("US").and("type").equals("individual").require("ssn")
+  .when("amount").gte(10000).or("risk").equals("high").require("verification");
+```
+
+## Helper Methods
+
+### requireWith
+
+If field A exists, field B must also exist:
+
+```ts
+schema.requireWith("streetAddress", "city")
+// If streetAddress is provided, city is required
+```
+
+### requireWithout
+
+If one field is absent, another field must exist:
+
+```ts
+schema.requireWithout("email", "phone")
+// If phone is missing, email is required
+```
+
+### mutuallyExclusive
+
+Two fields cannot both be present:
+
+```ts
+schema.mutuallyExclusive("ssn", "ein")
+// Cannot have both SSN and EIN
+```
+
+### requireOneOf
+
+At least one of the listed fields must exist:
+
+```ts
+schema.requireOneOf(["phone", "email", "fax"])
+// At least one contact method required
+```
+
+### requireExactlyOneOf
+
+Exactly one of the listed fields must exist:
+
+```ts
+schema.requireExactlyOneOf(["ssn", "ein", "itin"])
+// One identifier is required, but multiple identifiers are rejected
+```
+
+### requireFieldsMatch
+
+Two fields must have equal values:
+
+```ts
+schema.requireFieldsMatch("password", "confirmPassword")
+schema.requireFieldsMatch("scheduleB/total", "form941/liability")
+```
+
+### Field Comparison
+
+Compare field values:
+
+```ts
+schema.requireFieldGreaterThan("endDate", "startDate")
+schema.requireFieldGreaterOrEqual("maxAmount", "minAmount")
+schema.requireFieldLessThan("discount", "subtotal")
+schema.requireFieldLessOrEqual("used", "available")
+```
+
+### requireSum
+
+Fields must sum to a target field:
+
+```ts
+schema.requireSum(["line1", "line2", "line3"], "total")
+// line1 + line2 + line3 must equal total
+```
+
+### requireSumEquals
+
+Fields must sum to a specific value:
+
+```ts
+schema.requireSumEquals(["percent1", "percent2", "percent3"], 100)
+// Percentages must sum to 100
+```
+
+## Custom Rules
+
+For predicates that don't fit the helpers, use `.rule()` directly:
+
+```ts
+import type { Predicate } from "wellformed-ts";
+
+schema.rule(
+  {
+    type: "implies",
+    if: { type: "eq", path: "/status", value: "complete" },
+    then: { type: "exists", path: "/completedDate" },
+  },
+  "MISSING_DATE",
+  "Completed items must have a completion date"
+)
+```
+
+## Custom Error Messages
+
+All cross-field methods accept an options object:
+
+```ts
+schema.requireWith("streetAddress", "city", {
+  code: "MISSING_CITY",
+  message: "City is required when an address is provided",
+  help: "Please provide the city for the address",
+})
+```
+
+The options object supports `code`, `message`, `help`, `source`, and `id`.

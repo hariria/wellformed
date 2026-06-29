@@ -1,0 +1,208 @@
+---
+title: Getting Started
+description: Install wellformed and validate your first schema in under a minute.
+---
+
+<Steps>
+
+<Step>
+
+### Install
+
+<Tabs items={["npm", "pnpm", "yarn", "bun", "cargo"]}>
+
+<Tab value="npm">
+
+```bash
+npm install wellformed-ts
+```
+
+</Tab>
+
+<Tab value="pnpm">
+
+```bash
+pnpm add wellformed-ts
+```
+
+</Tab>
+
+<Tab value="yarn">
+
+```bash
+yarn add wellformed-ts
+```
+
+</Tab>
+
+<Tab value="bun">
+
+```bash
+bun add wellformed-ts
+```
+
+</Tab>
+
+<Tab value="cargo">
+
+```bash
+cargo add wellformed wellformed-macros serde_json
+```
+
+</Tab>
+
+</Tabs>
+
+Needs Node 18+ and TypeScript 5+ for the TypeScript package. The Rust crates support Rust 1.82+.
+
+</Step>
+
+<Step>
+
+### Build a schema
+
+<Tabs items={["TypeScript", "Rust"]}>
+
+<Tab value="TypeScript">
+
+```ts
+import { w } from "wellformed-ts";
+
+const contact = w
+  .object({
+    firstName: w.string().trim().minLen(1),
+    email: w.string().email(),
+    phone: w.string().phone().optional(),
+    age: w.integer().min(18).max(120),
+  })
+  .strict();
+```
+
+</Tab>
+
+<Tab value="Rust">
+
+```rust
+use wellformed_macros::wellformed;
+
+const CONTACT: wellformed::EmbeddedSchema = wellformed!("schemas/contact.json");
+```
+
+</Tab>
+
+</Tabs>
+
+In TypeScript, every method returns `this`, so you chain. Mark optionals with `.optional()`. `.strict()` rejects unknown keys. Rust embeds the serialized schema JSON as a value with `wellformed!`.
+
+</Step>
+
+<Step>
+
+### Validate
+
+<Tabs items={["TypeScript", "Rust"]}>
+
+<Tab value="TypeScript">
+
+```ts
+import { validate } from "wellformed-ts";
+
+const result = validate(contact.toSchema("1.0"), {
+  firstName: "  Alice  ",
+  email: "alice@example.com",
+  age: 30,
+});
+
+result.valid; // true
+result.value.firstName; // "Alice", trimmed by the schema
+```
+
+</Tab>
+
+<Tab value="Rust">
+
+```rust
+use serde_json::json;
+use wellformed_macros::wellformed;
+
+const CONTACT: wellformed::EmbeddedSchema = wellformed!("schemas/contact.json");
+
+fn validate_contact() -> wellformed::Result<()> {
+    let (result, value) = CONTACT.validate_json(r#"{
+      "firstName": "  Alice  ",
+      "email": "alice@example.com",
+      "age": 30
+    }"#)?;
+
+    assert!(result.is_valid());
+    assert_eq!(value["firstName"], json!("Alice"));
+
+    Ok(())
+}
+```
+
+</Tab>
+
+</Tabs>
+
+On failure, `result.errors` lists every field with a stable `code` and `message` in both runtimes.
+
+</Step>
+
+<Step>
+
+### Get the type for free
+
+<Tabs items={["TypeScript", "Rust"]}>
+
+<Tab value="TypeScript">
+
+```ts
+import type { Infer } from "wellformed-ts";
+
+type Contact = Infer<typeof contact>;
+```
+
+</Tab>
+
+<Tab value="Rust">
+
+```rust
+use wellformed_macros::form_schema;
+
+form_schema!(pub mod contact = "schemas/contact.json");
+
+type Contact = contact::Values;
+```
+
+</Tab>
+
+</Tabs>
+
+The schema is the source of truth. TypeScript infers from the builder. Rust can use `wellformed!` for value-style validation, or `form_schema!` when it needs generated `Values`, field metadata, and form state helpers.
+
+</Step>
+
+</Steps>
+
+<PlaygroundButton preset="contact-form">Explore an example in the Playground</PlaygroundButton>
+
+## Next
+
+<Cards>
+  <Card title="Domain validators" href="/docs/predicates">
+    SSN, EIN, CUSIP, IBAN, ICD-10, and 60+ more.
+  </Card>
+  <Card title="Cross-field rules" href="/docs/builder/cross-field-rules">
+    "If type is business, EIN is required."
+  </Card>
+  <Card title="Transforms" href="/docs/transforms">
+    Normalize input before it is validated.
+  </Card>
+  <Card title="Validate in Rust" href="/docs/rust-runtime">
+    Run the same IR in the Rust crate.
+  </Card>
+  <Card title="Use with Axum" href="/docs/axum">
+    Validate request JSON before Serde builds your Rust type.
+  </Card>
+</Cards>

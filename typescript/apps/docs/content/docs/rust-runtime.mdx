@@ -1,0 +1,284 @@
+---
+title: Rust Runtime
+description: Deserialize wellformed IR and validate data in Rust
+---
+
+The Rust crate evaluates the same JSON IR produced by the TypeScript builder. Use it when schemas are authored in TypeScript but enforcement needs to happen in a Rust service, worker, CLI, or batch process.
+
+<Callout title="What Rust validates">
+  Rust validates arbitrary submitted JSON before the data is trusted. It does
+  not require deserializing into an application struct first.
+</Callout>
+
+<Callout title="Building an Axum API?">
+  Use `Json&lt;serde_json::Value&gt;`, run wellformed, then deserialize the
+  normalized value into your Rust type. See the <a href="/docs/axum">Axum
+  guide</a>.
+</Callout>
+
+```text
+TypeScript schema -> JSON IR -> serde_json::Value -> wellformed::validate()
+```
+
+## Install
+
+For runtime-only validation:
+
+```bash
+cargo add wellformed serde_json
+```
+
+For generated Rust types and form helpers:
+
+```bash
+cargo add wellformed wellformed-macros serde_json
+cargo add serde --features derive
+```
+
+For local workspace development:
+
+```toml
+[dependencies]
+wellformed = { path = "../wellformed" }
+serde_json = "1"
+```
+
+The published Rust crates declare a minimum supported Rust version of 1.82.
+
+## Validate Serialized IR
+
+TypeScript can serialize a schema:
+
+```ts
+import { schemaToJSON, w } from "wellformed-ts";
+
+const schema = w.object({
+  name: w.string().trim().minLen(1),
+  ssn: w.string().digitsOnly().ssn(),
+}).strict().toSchema("1.0");
+
+const json = schemaToJSON(schema, true);
+```
+
+Rust can deserialize and evaluate it:
+
+```rust
+use wellformed::{validate, Schema};
+use serde_json::{json, Value};
+
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let schema_json = r#"{
+      "version": "1.0",
+      "root": {
+        "type": "object",
+        "unknown_keys": "strict",
+        "properties": {
+          "name": {
+            "type": "string",
+            "transforms": [{ "fn": "trim" }],
+            "constraints": [{
+              "pred": { "type": "min_len", "len": 1 },
+              "error": { "code": "NAME_REQUIRED", "message": "Name is required" }
+            }]
+          },
+          "ssn": {
+            "type": "string",
+            "transforms": [{ "fn": "digits_only" }],
+            "constraints": [{
+              "pred": { "type": "call", "name": "is_ssn" },
+              "error": { "code": "INVALID_SSN", "message": "Invalid SSN" }
+            }]
+          }
+        }
+      }
+    }"#;
+
+    let schema: Schema = serde_json::from_str(schema_json)?;
+    let mut value: Value = json!({
+        "name": "  Ada Lovelace  ",
+        "ssn": "123-45-6789"
+    });
+
+    let result = validate(&schema, &mut value)?;
+
+    assert!(result.is_valid());
+    assert_eq!(value["name"], json!("Ada Lovelace"));
+    assert_eq!(value["ssn"], json!("123456789"));
+
+    Ok(())
+}
+```
+
+Rust validation mutates the `serde_json::Value` in place when transforms run. Keep a copy of the raw input if you need both raw and normalized values.
+
+## Validation Results
+
+`validate` returns `Result<ValidationResult>`.
+
+```rust
+use serde_json::Value;
+use wellformed::{validate, Schema};
+
+fn print_errors(schema: &Schema, value: &mut Value) -> wellformed::Result<()> {
+    let result = validate(schema, value)?;
+
+    if result.is_valid() {
+        // value has been normalized in place
+    } else {
+        for error in &result.errors {
+            eprintln!("{} {}: {}", error.path, error.code, error.message);
+        }
+    }
+
+    Ok(())
+}
+```
+
+Warnings are collected separately and do not make `is_valid()` false.
+
+## Custom Predicates
+
+The default `validate` function uses the built-in global registry. Use `validate_with_registry` when a schema contains organization-specific predicates.
+
+```rust
+use serde_json::Value;
+use std::sync::Arc;
+use wellformed::runtime::{validate_with_registry, NamedPredicate, PredicateRegistry};
+use wellformed::Schema;
+
+struct IsInternalAccount;
+
+impl NamedPredicate for IsInternalAccount {
+    fn name(&self) -> &str {
+        "is_internal_account"
+    }
+
+    fn evaluate(&self, value: &Value, _args: &Value) -> bool {
+        value
+            .as_str()
+            .map(|s| s.starts_with("acct_"))
+            .unwrap_or(false)
+    }
+}
+
+fn validate_input(schema_json: &str, input_json: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let mut registry = PredicateRegistry::with_builtins();
+    registry.register(Arc::new(IsInternalAccount));
+
+    let schema: Schema = serde_json::from_str(schema_json)?;
+    let mut value: Value = serde_json::from_str(input_json)?;
+    let result = validate_with_registry(&schema, &mut value, &registry)?;
+
+    if !result.is_valid() {
+        for error in &result.errors {
+            eprintln!("{}: {}", error.code, error.message);
+        }
+    }
+
+    Ok(())
+}
+```
+
+Register the same predicate names and semantics in every runtime that evaluates the same schema.
+
+## Embedded Schemas
+
+The `wellformed-macros` crate exposes `wellformed!` for embedding a schema JSON file as a value:
+
+```rust
+use wellformed_macros::wellformed;
+
+const SIGNUP: wellformed::EmbeddedSchema = wellformed!("schemas/signup.json");
+
+fn main() -> wellformed::Result<()> {
+    let signup = wellformed!("schemas/signup.json");
+    let (result, _value) = signup.validate_json(r#"{"email":"ada@example.com"}"#)?;
+
+    assert!(result.is_valid());
+
+    Ok(())
+}
+```
+
+Use this when you want a schema handle for validating `serde_json::Value` without generating Rust structs.
+
+## Rust Codegen
+
+Use `form_schema!` when you want generated `Values`, `Errors`, field metadata, and framework-neutral form state helpers:
+
+```rust
+use wellformed_macros::form_schema;
+
+form_schema!(pub mod signup = "schemas/signup.json");
+
+fn main() {
+    // The generated `validate_json` returns `Result<signup::Values, signup::Errors>`,
+    // not `wellformed::Result`, so handle the error case directly.
+    let Ok(values) = signup::validate_json(r#"{"email":"ada@example.com"}"#) else {
+        return;
+    };
+    let _state = signup::state(values);
+    let _first_field = &signup::FIELDS[0];
+}
+```
+
+The generated module exposes `Values`, `Errors`, `State`, `ID`, `TITLE`, `DESCRIPTION`, `SCHEMA_JSON`, `FIELDS`, `CLIENT`, generated field accessors such as `field_email(&state)`, optional client helper functions when a client macro path is configured, `schema()`, `validate()`, `validate_value()`, `validate_json()`, `validate_form()`, `state()`, and `state_with_errors()`. The form state and metadata types are framework-neutral (`wellformed::FormState`, `FormErrors`, `FieldSpec`, `FieldState`, and `ClientFormSpec`) so server-rendered, client-rendered, and hybrid Rust apps can share the same schema contract while preserving submitted values for validation-error re-renders.
+
+Generated Rust field names are derived from schema keys. Labels remain presentation metadata, so changing a field label does not rename the Rust struct field.
+
+Use `wel_schema!` only when you prefer free-floating generated structs instead of a namespaced module:
+
+```rust
+use wellformed_macros::wel_schema;
+
+wel_schema!("schemas/signup.json");
+```
+
+The codegen macros intentionally do not generate Axum handlers by default, so applications that only need Rust types do not inherit web-framework dependencies.
+
+Use lower-level codegen when you want API handlers, repository traits, and OpenAPI constants:
+
+```rust
+use wellformed::codegen::{generate_all, CodegenOptions, GeneratedCode};
+use wellformed::Schema;
+
+fn generate_api_code(schema_json: &str) -> Result<GeneratedCode, serde_json::Error> {
+    let schema: Schema = serde_json::from_str(schema_json)?;
+
+    Ok(generate_all(
+        &schema,
+        schema_json,
+        &CodegenOptions {
+            generate_api: true,
+            ..CodegenOptions::default()
+        },
+    ))
+}
+```
+
+Generated API code is an application scaffold. The consuming crate must provide the web/runtime dependencies used by the generated handlers, such as Axum, serde JSON support, CSV/import helpers, and repository implementations.
+
+PDF render handlers are disabled unless `generate_pdf_handlers` is also set. Leave them off unless the consuming application provides the currently expected PDF pieces: `wireform_acroform::FormFiller`, `templates::*_PDF_BYTES` constants, `crate::render::render_form_to_pdf`, and any CSV mapping modules referenced by the generated scaffold.
+
+## Feature Notes
+
+- Built-in predicates are available through `PredicateRegistry::with_builtins()` and the global registry used by `validate`.
+- The optional `address` feature registers libpostal-backed address parsing predicates when enabled. It requires native libpostal headers, libraries, and parser data at build/runtime.
+- Regex predicates are cached by the Rust runtime.
+- Validation transforms values before constraints are evaluated.
+- `ref` schemas are resolved by the Rust runtime through schema definitions; verify recursive or deeply nested references with application tests before using them for untrusted input.
+
+The default Rust crate does not require native address-parsing libraries. If you
+enable `wellformed = { features = ["address"] }`, install the native libpostal C
+library, headers, and parser data first; that feature uses the `postal` crate and
+will not compile on machines missing `libpostal/libpostal.h`.
+
+Some libpostal installs, including Homebrew on Apple Silicon, expose headers
+through `pkg-config` but not through Clang's default include path. In that case,
+build with:
+
+```bash
+export BINDGEN_EXTRA_CLANG_ARGS="$(pkg-config --cflags libpostal)"
+export LIBRARY_PATH="$(pkg-config --variable=libdir libpostal):${LIBRARY_PATH:-}"
+cargo check -p wellformed --features address
+```

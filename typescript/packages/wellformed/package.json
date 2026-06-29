@@ -1,0 +1,127 @@
+{
+  "name": "wellformed-ts",
+  "version": "0.1.0",
+  "description": "Declarative form validation schemas - TypeScript runtime and Zod-like builder",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./builder": {
+      "import": {
+        "types": "./dist/builder/index.d.ts",
+        "default": "./dist/builder/index.js"
+      },
+      "require": {
+        "types": "./dist/builder/index.d.cts",
+        "default": "./dist/builder/index.cjs"
+      }
+    },
+    "./forms": {
+      "import": {
+        "types": "./dist/forms/index.d.ts",
+        "default": "./dist/forms/index.js"
+      },
+      "require": {
+        "types": "./dist/forms/index.d.cts",
+        "default": "./dist/forms/index.cjs"
+      }
+    },
+    "./ir": {
+      "import": {
+        "types": "./dist/ir/index.d.ts",
+        "default": "./dist/ir/index.js"
+      },
+      "require": {
+        "types": "./dist/ir/index.d.cts",
+        "default": "./dist/ir/index.cjs"
+      }
+    },
+    "./runtime": {
+      "import": {
+        "types": "./dist/runtime/index.d.ts",
+        "default": "./dist/runtime/index.js"
+      },
+      "require": {
+        "types": "./dist/runtime/index.d.cts",
+        "default": "./dist/runtime/index.cjs"
+      }
+    },
+    "./serialize": {
+      "import": {
+        "types": "./dist/serialize.d.ts",
+        "default": "./dist/serialize.js"
+      },
+      "require": {
+        "types": "./dist/serialize.d.cts",
+        "default": "./dist/serialize.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "README.md",
+    "skills.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:package": "npm run build && node scripts/smoke-packed-package.mjs",
+    "lint": "biome check .",
+    "lint:fix": "biome check --write .",
+    "format": "biome format --write .",
+    "typecheck": "tsc --noEmit",
+    "types:check": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "bench:validators": "tsup && node benchmarks/validators.mjs",
+    "bench:validators:json": "tsup && node benchmarks/validators.mjs --json",
+    "prepack": "npm run build",
+    "prepublishOnly": "npm run lint && npm run types:check && npm test && npm run test:package"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsup": "^8.3.5",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.2",
+    "valibot": "^1.4.2",
+    "vitest": "^3.2.6",
+    "yup": "^1.7.1",
+    "zod": "^4.4.3"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "wellformed",
+    "validation",
+    "schema",
+    "forms",
+    "ir",
+    "tax"
+  ],
+  "homepage": "https://wellformed.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/acrof/wellformed.git",
+    "directory": "typescript/packages/wellformed"
+  },
+  "bugs": {
+    "url": "https://github.com/acrof/wellformed/issues"
+  },
+  "license": "MIT"
+}

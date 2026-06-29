@@ -1,0 +1,24 @@
+{
+  "title": "Documentation",
+  "pages": [
+    "index",
+    "getting-started",
+    "recipes",
+    "production",
+    "ai-integration",
+    "comparison",
+    "performance",
+    "---Builder API---",
+    "builder",
+    "---Runtime---",
+    "validation",
+    "rust-runtime",
+    "axum",
+    "predicates",
+    "transforms",
+    "---Advanced---",
+    "type-inference",
+    "serialization",
+    "ir-schema"
+  ]
+}

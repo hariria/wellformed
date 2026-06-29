@@ -5,7 +5,7 @@ This repository has separate release flows for TypeScript and Rust.
 ## Preflight
 
 - Use the documented Node runtime (`nvm use`) before TypeScript release checks.
-- Use Rust 1.82 or newer before Rust release checks.
+- Use Rust 1.93.0 or newer before Rust release checks.
 - The local preflight script allows uncommitted package metadata changes so it
   can run during release preparation. Commit release changes before publishing.
 - Confirm public package metadata points at the final repository URL before publishing:

@@ -2,7 +2,7 @@
 name = "wellformed"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.93.0"
 description = "Declarative form validation schemas with transforms, constraints, and codegen"
 license = "MIT"
 readme = "README.md"

@@ -145,7 +145,7 @@ pub(crate) fn luhn_check(s: &str) -> bool {
         should_double = !should_double;
     }
 
-    saw_digit && sum % 10 == 0
+    saw_digit && sum.is_multiple_of(10)
 }
 
 #[cfg(test)]

@@ -74,7 +74,7 @@ application wants those scaffolds and can provide the necessary dependencies.
 
 ## Requirements
 
-- Rust 1.82 or newer
+- Rust 1.93.0 or newer
 - `serde` / `serde_json` in the consuming crate when using generated serde
   types from `form_schema!` or `wel_schema!`
 

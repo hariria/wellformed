@@ -2,7 +2,7 @@
 name = "wellformed-macros"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.93.0"
 description = "Proc macros for generating Rust types and form facades from wellformed schemas"
 license = "MIT"
 readme = "README.md"

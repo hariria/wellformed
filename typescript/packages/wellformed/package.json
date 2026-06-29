@@ -1,6 +1,6 @@
 {
   "name": "wellformed-ts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Declarative form validation schemas - TypeScript runtime and Zod-like builder",
   "type": "module",
   "main": "./dist/index.cjs",

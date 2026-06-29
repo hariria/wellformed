@@ -8,10 +8,7 @@ const getDocsUrl = createGetUrl("/docs");
 const appDir = dirname(fileURLToPath(import.meta.url));
 const docsContentDir = join(appDir, "content/docs");
 
-async function* walkMdxFiles(
-  dir: string,
-  prefix = "",
-): AsyncGenerator<string> {
+async function* walkMdxFiles(dir: string, prefix = ""): AsyncGenerator<string> {
   for (const entry of await readdir(dir, { withFileTypes: true })) {
     const relativePath = prefix ? `${prefix}/${entry.name}` : entry.name;
     const absolutePath = join(dir, entry.name);

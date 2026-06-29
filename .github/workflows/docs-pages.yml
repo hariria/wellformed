@@ -54,6 +54,10 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: typescript
 
+      - name: Build Package
+        run: pnpm --filter wellformed-ts build
+        working-directory: typescript
+
       - name: Build Docs
         run: pnpm --filter @wellformed/docs build
         working-directory: typescript

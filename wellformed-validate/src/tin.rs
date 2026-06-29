@@ -373,14 +373,6 @@ pub fn validate_ein_batch(eins: &[&str]) -> BatchResult {
 
 #[cfg(all(target_arch = "x86_64", feature = "simd"))]
 mod simd_x86 {
-    use super::*;
-
-    /// Check if AVX2 is available at runtime.
-    #[inline]
-    pub fn has_avx2() -> bool {
-        is_x86_feature_detected!("avx2")
-    }
-
     /// Validate 8 packed TINs simultaneously using AVX2.
     ///
     /// Each TIN is packed as a u32 in the format:

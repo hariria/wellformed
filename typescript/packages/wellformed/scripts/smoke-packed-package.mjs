@@ -38,12 +38,15 @@ function run(command, args, options = {}) {
 }
 
 function parseNpmPackJson(output) {
-  const start = output.indexOf("[");
-  const end = output.lastIndexOf("]");
-  if (start === -1 || end === -1 || end < start) {
+  const ansiEscape = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+  const withoutAnsi = output.replace(ansiEscape, "");
+  const start = withoutAnsi.lastIndexOf("\n[");
+  const jsonStart = start === -1 ? withoutAnsi.indexOf("[") : start + 1;
+  const end = withoutAnsi.lastIndexOf("]");
+  if (jsonStart === -1 || end === -1 || end < jsonStart) {
     throw new Error(`Could not parse npm pack JSON:\n${output}`);
   }
-  const parsed = JSON.parse(output.slice(start, end + 1));
+  const parsed = JSON.parse(withoutAnsi.slice(jsonStart, end + 1));
   const first = parsed[0];
   if (!first?.filename) {
     throw new Error(`npm pack did not return a filename:\n${output}`);

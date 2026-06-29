@@ -8,6 +8,11 @@ updates:
       time: "09:00"
       timezone: America/Los_Angeles
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
     groups:
       rust-dependencies:
         patterns:
@@ -21,6 +26,11 @@ updates:
       time: "09:00"
       timezone: America/Los_Angeles
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
     groups:
       typescript-dependencies:
         patterns:
@@ -34,6 +44,11 @@ updates:
       time: "09:00"
       timezone: America/Los_Angeles
     open-pull-requests-limit: 5
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - version-update:semver-patch
+          - version-update:semver-minor
     groups:
       github-actions:
         patterns:

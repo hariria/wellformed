@@ -29,7 +29,7 @@ Serializable JSON IR
 
 | If you need... | Use |
 |---|---|
-| Fast form or API validation inside TypeScript only | Zod |
+| Form or API validation inside one TypeScript app, nothing leaving JS | Zod |
 | OpenAPI compatibility and broad ecosystem tooling | JSON Schema |
 | Shared TypeScript and Rust validation | **wellformed** |
 | Validation rules stored in a database or config service | **wellformed** |
@@ -37,6 +37,12 @@ Serializable JSON IR
 | Cross-field rules that remain inspectable data | **wellformed** |
 | Predicates, transforms, and cross-field checks without custom glue code | **wellformed** |
 | A legacy Node validation library | Yup / Joi |
+
+<Callout title="A note on speed">
+  Speed is not a reason to choose Zod over wellformed. In the same V8 runtime,
+  wellformed-ts validates 10 to 40x faster than Zod, and on par with Valibot.
+  The Rust runtime is faster still. See the [benchmark](/docs/performance).
+</Callout>
 
 ## Why Developers Switch
 

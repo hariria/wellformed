@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-label="wellformed: validation logic should be data, not a closure.">
+  <rect width="1200" height="630" fill="#FBFBF8"/>
+  <rect x="44" y="44" width="1112" height="542" rx="52" fill="#17181B"/>
+  <rect x="92" y="104" width="140" height="140" rx="32" fill="#76CE54"/>
+  <g font-weight="600" text-anchor="middle" dominant-baseline="central">
+    <text x="120" y="196" font-family="JetBrains Mono, ui-monospace, monospace" font-size="84" fill="#FFFFFF">{</text>
+    <text x="162" y="196" font-family="Space Grotesk, Inter, system-ui, sans-serif" font-size="64" font-weight="700" fill="#FFFFFF">w</text>
+    <text x="204" y="196" font-family="JetBrains Mono, ui-monospace, monospace" font-size="84" fill="#FFFFFF">}</text>
+  </g>
+  <text x="92" y="304" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="78" font-weight="700" fill="#FFFFFF">wellformed</text>
+  <text x="92" y="382" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="43" font-weight="700" fill="#FBFBF8">Validation logic should be data.</text>
+  <text x="92" y="444" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="30" fill="#C9CDD3">Author schemas in TypeScript. Ship portable JSON IR.</text>
+  <text x="92" y="494" font-family="Menlo, Monaco, Consolas, monospace" font-size="25" fill="#76CE54">TypeScript builder -&gt; JSON IR -&gt; TypeScript + Rust runtimes</text>
+  <rect x="92" y="538" width="1016" height="1" fill="#30333A"/>
+  <text x="92" y="564" font-family="Menlo, Monaco, Consolas, monospace" font-size="20" fill="#9296A0">wellformed.net</text>
+</svg>

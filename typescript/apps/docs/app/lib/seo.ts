@@ -44,7 +44,10 @@ export function seoMeta({
   return [
     { title },
     { name: "description", content: description },
-    { name: "robots", content: noIndex ? "noindex, nofollow" : "index, follow" },
+    {
+      name: "robots",
+      content: noIndex ? "noindex, nofollow" : "index, follow",
+    },
     { property: "og:type", content: type },
     { property: "og:site_name", content: siteMetadata.name },
     { property: "og:title", content: title },

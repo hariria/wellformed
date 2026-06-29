@@ -13,8 +13,7 @@ export const siteMetadata = {
   description:
     "Author validation schemas in TypeScript, compile them to a portable JSON IR, and run the same rules in TypeScript and Rust.",
   ogImage: "/og-image.png",
-  ogImageAlt:
-    "wellformed: validation logic should be data, not a closure.",
+  ogImageAlt: "wellformed: validation logic should be data, not a closure.",
 };
 
 export const gitConfig = {

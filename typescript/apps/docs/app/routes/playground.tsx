@@ -45,11 +45,10 @@ export default function PlaygroundPage({ loaderData }: Route.ComponentProps) {
           to="/"
           className="inline-flex items-center gap-2 font-bold text-lg tracking-tight"
         >
-          <img
-            src="/favicon.svg"
-            alt=""
+          <span
             aria-hidden="true"
-            className="size-6 rounded-md"
+            className="size-6 rounded-md bg-contain bg-center bg-no-repeat"
+            style={{ backgroundImage: 'url("/favicon.svg")' }}
           />
           <span>wellformed</span>
         </Link>

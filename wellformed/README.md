@@ -24,7 +24,7 @@ wellformed = { path = "../wellformed" }
 serde_json = "1"
 ```
 
-The crate declares Rust 1.82 as its minimum supported Rust version.
+The crate declares Rust 1.93.0 as its minimum supported Rust version.
 
 ## Validate JSON IR
 

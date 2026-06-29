@@ -7,11 +7,31 @@ import {
   Scripts,
   ScrollRestoration,
 } from "react-router";
+import { siteMetadata } from "@/lib/shared";
 import type { Route } from "./+types/root";
 import "./app.css";
 import NotFound from "./routes/not-found";
 
 export const links: Route.LinksFunction = () => [
+  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+  {
+    rel: "icon",
+    href: "/favicon-light.svg",
+    type: "image/svg+xml",
+    media: "(prefers-color-scheme: light)",
+  },
+  {
+    rel: "icon",
+    href: "/favicon-16.svg",
+    type: "image/svg+xml",
+    sizes: "32x32",
+  },
+  {
+    rel: "apple-touch-icon",
+    href: "/apple-touch-icon.png",
+    sizes: "180x180",
+  },
+  { rel: "manifest", href: "/site.webmanifest" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -24,23 +44,29 @@ export const links: Route.LinksFunction = () => [
   },
 ];
 
-export function meta(_: Route.MetaArgs) {
-  return [
-    { title: "wellformed: Portable Validation Schemas" },
-    {
-      name: "description",
-      content:
-        "A portable, declarative schema language for form validation. A Zod-like TypeScript builder that compiles to a serializable IR, with 60+ domain-specific validators for tax forms, financial data, and more.",
-    },
-  ];
-}
-
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="application-name" content={siteMetadata.name} />
+        <meta name="apple-mobile-web-app-title" content={siteMetadata.name} />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="format-detection" content="telephone=no" />
+        <meta name="color-scheme" content="light dark" />
+        <meta
+          name="theme-color"
+          content="#FBFBF8"
+          media="(prefers-color-scheme: light)"
+        />
+        <meta
+          name="theme-color"
+          content="#17181B"
+          media="(prefers-color-scheme: dark)"
+        />
         <Meta />
         <Links />
       </head>

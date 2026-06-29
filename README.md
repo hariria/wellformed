@@ -65,7 +65,7 @@ if (result.valid) {
 
 Prerequisites:
 
-- Rust 1.82+ stable toolchain
+- Rust 1.93.0+ stable toolchain
 - `cargo-audit` (`cargo install cargo-audit --locked --version 0.22.1`)
 - Node.js 22 LTS (`nvm use`)
 - pnpm 9+

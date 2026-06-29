@@ -54,6 +54,10 @@ jobs:
         run: pnpm install --frozen-lockfile
         working-directory: typescript
 
+      - name: Build Package
+        run: pnpm --filter wellformed-ts build
+        working-directory: typescript
+
       - name: Build Docs
         run: pnpm --filter @wellformed/docs build
         working-directory: typescript
@@ -65,6 +69,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           workingDirectory: typescript/apps/docs
+          packageManager: pnpm
           command: >-
             pages deploy build/client
             --project-name=${{ env.CLOUDFLARE_PAGES_PROJECT_NAME }}

@@ -16,18 +16,16 @@ import {
 import { Link } from "react-router";
 import { CodeShowcase, CopyButton } from "@/components/landing/code-showcase";
 import { baseOptions } from "@/lib/layout.shared";
-import { gitConfig } from "@/lib/shared";
+import { absoluteUrl, getRequestOrigin } from "@/lib/seo";
+import { gitConfig, siteMetadata } from "@/lib/shared";
 import type { Route } from "./+types/home";
 
-export function meta(_: Route.MetaArgs) {
-  return [
-    { title: "wellformed: Validation logic should be data" },
-    {
-      name: "description",
-      content:
-        "Author validation schemas in TypeScript, compile them to a portable JSON IR, and run the exact same rules in TypeScript and Rust. 60+ domain validators, cross-field rules, transforms, and full type inference.",
-    },
-  ];
+const HOME_TITLE = "wellformed: Validation logic should be data";
+const HOME_DESCRIPTION =
+  "Author validation schemas in TypeScript, compile them to a portable JSON IR, and run the exact same rules in TypeScript and Rust. 60+ domain validators, cross-field rules, transforms, and full type inference.";
+
+export function loader({ request }: Route.LoaderArgs) {
+  return { origin: getRequestOrigin(request) };
 }
 
 const gridStyle: React.CSSProperties = {
@@ -79,9 +77,29 @@ const FEATURES = [
   },
 ];
 
-export default function Home() {
+export default function Home({ loaderData }: Route.ComponentProps) {
+  const canonicalUrl = absoluteUrl("/", loaderData.origin);
+  const imageUrl = absoluteUrl(siteMetadata.ogImage, loaderData.origin);
+
   return (
     <HomeLayout {...baseOptions()}>
+      <title>{HOME_TITLE}</title>
+      <meta name="description" content={HOME_DESCRIPTION} />
+      <link rel="canonical" href={canonicalUrl} />
+      <meta name="robots" content="index, follow" />
+      <meta property="og:type" content="website" />
+      <meta property="og:site_name" content={siteMetadata.name} />
+      <meta property="og:title" content={HOME_TITLE} />
+      <meta property="og:description" content={HOME_DESCRIPTION} />
+      <meta property="og:url" content={canonicalUrl} />
+      <meta property="og:image" content={imageUrl} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta property="og:image:alt" content={siteMetadata.ogImageAlt} />
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={HOME_TITLE} />
+      <meta name="twitter:description" content={HOME_DESCRIPTION} />
+      <meta name="twitter:image" content={imageUrl} />
       <div className="flex flex-1 flex-col">
         {/* ── Hero ─────────────────────────────────────────────── */}
         <section className="relative overflow-hidden border-b border-border">
@@ -263,6 +281,35 @@ export default function Home() {
           </div>
         </section>
 
+        {/* ── Performance ──────────────────────────────────────── */}
+        <section className="border-b border-border bg-muted/20">
+          <div className="mx-auto max-w-6xl px-6 py-20 text-center">
+            <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-brand">
+              Performance
+            </p>
+            <h2 className="mt-3 font-display text-3xl tracking-tight text-foreground sm:text-4xl">
+              Purpose-built beats regex.
+            </h2>
+            <p className="mx-auto mt-4 max-w-2xl leading-relaxed text-muted-foreground">
+              Most validators lean on generic regex. wellformed's built-in
+              predicates are purpose-built, so an email or SSN checks in tens of
+              nanoseconds instead of microseconds. That is 10 to 40x faster than
+              Zod in the same V8 runtime, and the Rust runtime goes further with
+              SIMD-friendly byte scanners.
+            </p>
+
+            <PerfChart />
+
+            <Link
+              to="/docs/performance"
+              className="group mt-8 inline-flex items-center gap-1.5 text-sm font-medium text-foreground hover:text-brand"
+            >
+              See the full benchmark
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          </div>
+        </section>
+
         {/* ── Final CTA ────────────────────────────────────────── */}
         <section className="relative overflow-hidden">
           <div
@@ -332,6 +379,100 @@ export default function Home() {
 }
 
 // Visual: one schema flowing across a runtime boundary into TS and Rust.
+// Validation latency, wellformed-ts vs Zod, on a shared linear scale so the
+// order-of-magnitude gap is visible at a glance. Numbers from /docs/performance.
+function PerfChart() {
+  const MAX_NS = 4410; // longest bar (Zod, URL)
+  const rows = [
+    {
+      label: "Email",
+      wf: 61,
+      zod: 2730,
+      wfL: "61 ns",
+      zodL: "2.73 µs",
+      mult: "45x",
+    },
+    {
+      label: "URL",
+      wf: 106,
+      zod: 4410,
+      wfL: "106 ns",
+      zodL: "4.41 µs",
+      mult: "42x",
+    },
+    {
+      label: "SSN",
+      wf: 85,
+      zod: 2560,
+      wfL: "85 ns",
+      zodL: "2.56 µs",
+      mult: "30x",
+    },
+    {
+      label: "Object",
+      wf: 411,
+      zod: 4350,
+      wfL: "411 ns",
+      zodL: "4.35 µs",
+      mult: "11x",
+    },
+  ];
+
+  return (
+    <div className="mx-auto mt-10 max-w-2xl text-left">
+      <div className="mb-6 flex items-center justify-end gap-5 font-mono text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-sm bg-brand" />
+          wellformed-ts
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="size-2.5 rounded-sm bg-muted-foreground/30" />
+          Zod
+        </span>
+      </div>
+
+      <div className="space-y-5">
+        {rows.map((r) => (
+          <div key={r.label}>
+            <div className="mb-1.5 flex items-baseline justify-between">
+              <span className="font-mono text-xs uppercase tracking-wider text-foreground">
+                {r.label}
+              </span>
+              <span className="font-mono text-[11px] text-brand">
+                {r.mult} faster
+              </span>
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-2.5 rounded-full bg-brand"
+                  style={{ width: `max(0.5rem, ${(r.wf / MAX_NS) * 100}%)` }}
+                />
+                <span className="font-mono text-[11px] text-foreground">
+                  {r.wfL}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <div
+                  className="h-2.5 rounded-full bg-muted-foreground/30"
+                  style={{ width: `${(r.zod / MAX_NS) * 100}%` }}
+                />
+                <span className="font-mono text-[11px] text-muted-foreground">
+                  {r.zodL}
+                </span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <p className="mt-6 text-center font-mono text-[10px] text-muted-foreground/60">
+        Validation latency, lower is faster. Same V8 runtime, Apple Silicon.
+      </p>
+    </div>
+  );
+}
+
 function BoundaryDiagram() {
   return (
     <div className="rounded-2xl border border-border bg-card p-6 sm:p-8">

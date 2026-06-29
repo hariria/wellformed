@@ -2,12 +2,12 @@
 name = "wellformed-validate"
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.82"
+rust-version = "1.93.0"
 description = "High-performance validation primitives for wellformed schemas"
 license = "MIT"
 readme = "README.md"
-repository = "https://github.com/acrof/wellformed"
-homepage = "https://wellformed.dev"
+repository = "https://github.com/hariria/wellformed"
+homepage = "https://wellformed.net"
 documentation = "https://docs.rs/wellformed-validate"
 keywords = ["validation", "schema", "simd", "tin"]
 categories = ["data-structures", "development-tools"]

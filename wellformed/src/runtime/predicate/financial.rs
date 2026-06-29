@@ -228,7 +228,7 @@ impl NamedPredicate for IsAbaRoutingPredicate {
 
         let checksum = 3 * (d[0] + d[3] + d[6]) + 7 * (d[1] + d[4] + d[7]) + (d[2] + d[5] + d[8]);
 
-        checksum % 10 == 0
+        checksum.is_multiple_of(10)
     }
 }
 
@@ -910,7 +910,7 @@ impl NamedPredicate for IsUpcPredicate {
                 sum += d;
             }
         }
-        sum % 10 == 0
+        sum.is_multiple_of(10)
     }
 }
 
@@ -957,7 +957,7 @@ impl NamedPredicate for IsEanPredicate {
                 sum += d * 3;
             }
         }
-        sum % 10 == 0
+        sum.is_multiple_of(10)
     }
 }
 
@@ -1025,7 +1025,7 @@ fn isbn10_check(s: &str) -> bool {
         };
         sum += val * (10 - i as u32);
     }
-    sum % 11 == 0
+    sum.is_multiple_of(11)
 }
 
 fn isbn13_check(s: &str) -> bool {
@@ -1051,7 +1051,7 @@ fn isbn13_check(s: &str) -> bool {
             sum += d * 3;
         }
     }
-    sum % 10 == 0
+    sum.is_multiple_of(10)
 }
 
 #[cfg(test)]

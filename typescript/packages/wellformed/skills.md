@@ -122,10 +122,10 @@ When a Rust service validates the same schema, pass JSON IR across the boundary 
 
 ## Useful Docs
 
-- Full docs text: `https://wellformed.dev/llms-full.txt`
-- Markdown page twins: append `.md` to a docs page, such as `https://wellformed.dev/docs/getting-started.md`
-- Getting started: `https://wellformed.dev/docs/getting-started`
-- Production use: `https://wellformed.dev/docs/production`
-- Validation runtime: `https://wellformed.dev/docs/validation`
-- Serialization: `https://wellformed.dev/docs/serialization`
-- Rust runtime: `https://wellformed.dev/docs/rust-runtime`
+- Full docs text: `https://wellformed.net/llms-full.txt`
+- Markdown page twins: append `.md` to a docs page, such as `https://wellformed.net/docs/getting-started.md`
+- Getting started: `https://wellformed.net/docs/getting-started`
+- Production use: `https://wellformed.net/docs/production`
+- Validation runtime: `https://wellformed.net/docs/validation`
+- Serialization: `https://wellformed.net/docs/serialization`
+- Rust runtime: `https://wellformed.net/docs/rust-runtime`

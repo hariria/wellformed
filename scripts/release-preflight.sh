@@ -85,8 +85,8 @@ run_rust_checks() {
   require_command rustup
   require_command cargo-audit "install with: cargo install cargo-audit --locked --version 0.22.1"
 
-  run rustup toolchain install 1.82.0
-  run cargo +1.82.0 check --workspace --all-targets --locked
+  run rustup toolchain install 1.93.0
+  run cargo +1.93.0 check --workspace --all-targets --locked
   run cargo fmt --check
   run cargo clippy --workspace --all-targets -- -D warnings
   echo "+ RUSTDOCFLAGS=-D warnings cargo doc --workspace --no-deps"

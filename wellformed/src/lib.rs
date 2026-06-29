@@ -62,7 +62,7 @@
 //! assert_eq!(value["tin"], json!("123456789")); // Transformed
 //! ```
 //!
-//! See <https://wellformed.dev/docs/rust-runtime> for Rust runtime usage.
+//! See <https://wellformed.net/docs/rust-runtime> for Rust runtime usage.
 
 pub mod codegen;
 pub mod error;

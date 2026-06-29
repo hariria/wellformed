@@ -5,12 +5,7 @@ const ROOT = "build/client";
 const ORIGIN = "https://wellformed.local";
 
 const DOCUMENT_EXTENSIONS = new Set([".html", ".md", ".txt"]);
-const IGNORE_PROTOCOLS = new Set([
-  "data:",
-  "javascript:",
-  "mailto:",
-  "tel:",
-]);
+const IGNORE_PROTOCOLS = new Set(["data:", "javascript:", "mailto:", "tel:"]);
 
 async function walk(dir) {
   const out = [];
@@ -46,9 +41,10 @@ function extractLinks(file, text) {
     : [...markdownPatterns, ...htmlPatterns];
 
   for (const pattern of patterns) {
-    let match;
-    while ((match = pattern.exec(text))) {
+    let match = pattern.exec(text);
+    while (match) {
       links.push(match[1]);
+      match = pattern.exec(text);
     }
   }
   return links;
@@ -106,7 +102,9 @@ async function hasBuiltTarget(pathname) {
 }
 
 const files = await walk(ROOT);
-const documents = files.filter((file) => DOCUMENT_EXTENSIONS.has(extname(file)));
+const documents = files.filter((file) =>
+  DOCUMENT_EXTENSIONS.has(extname(file)),
+);
 const failures = [];
 let checkedLinks = 0;
 

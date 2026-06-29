@@ -7,7 +7,7 @@ Please do not open public issues for suspected security vulnerabilities.
 Instead:
 
 - Use GitHub Security Advisories / private vulnerability reporting:
-  <https://github.com/acrof/wellformed/security/advisories/new>
+  <https://github.com/hariria/wellformed/security/advisories/new>
 - Include:
   - affected component/crate/package
   - impact summary

@@ -14,7 +14,7 @@ Thanks for contributing to wellformed.
 Install Rust, `nvm`, pnpm, and `cargo-audit` first:
 
 ```bash
-rustup toolchain install 1.82.0
+rustup toolchain install 1.93.0
 cargo install cargo-audit --locked --version 0.22.1
 nvm install
 corepack enable pnpm
@@ -24,7 +24,7 @@ corepack enable pnpm
 bash scripts/release-preflight.sh
 ```
 
-This runs the Rust and TypeScript release checks, including Rust 1.82 MSRV,
+This runs the Rust and TypeScript release checks, including Rust 1.93.0 MSRV,
 linting, rustdoc, dependency audits, tests, package checks, docs build, packed
 npm package smoke tests, and the Node 18 minimum-runtime smoke test.
 

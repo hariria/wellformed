@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-repo="${WELLFORMED_REPO:-acrof/wellformed}"
-docs_url="${WELLFORMED_DOCS_URL:-https://wellformed.dev}"
+repo="${WELLFORMED_REPO:-hariria/wellformed}"
+docs_url="${WELLFORMED_DOCS_URL:-https://wellformed.net}"
 
 require_command() {
   local command="$1"

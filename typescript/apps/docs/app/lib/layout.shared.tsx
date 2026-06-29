@@ -6,7 +6,14 @@ export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
       title: (
-        <span className="font-bold text-xl tracking-tight">wellformed</span>
+        <span className="inline-flex items-center gap-2 font-bold text-xl tracking-tight">
+          <span
+            aria-hidden="true"
+            className="size-6 rounded-md bg-contain bg-center bg-no-repeat"
+            style={{ backgroundImage: 'url("/favicon.svg")' }}
+          />
+          <span>wellformed</span>
+        </span>
       ),
     },
     links: [

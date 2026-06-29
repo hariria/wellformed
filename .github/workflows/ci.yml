@@ -25,8 +25,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Rust 1.82
-        uses: dtolnay/rust-toolchain@1.82.0
+      - name: Setup Rust 1.93.0
+        uses: dtolnay/rust-toolchain@1.93.0
 
       - name: Cache Rust
         uses: actions/cache@v4
@@ -35,9 +35,9 @@ jobs:
             ~/.cargo/git
             ~/.cargo/registry
             target
-          key: ${{ runner.os }}-cargo-msrv-${{ hashFiles('Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-msrv-1.93.0-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-msrv-
+            ${{ runner.os }}-cargo-msrv-1.93.0-
 
       - name: Check Workspace
         run: cargo check --workspace --all-targets --locked

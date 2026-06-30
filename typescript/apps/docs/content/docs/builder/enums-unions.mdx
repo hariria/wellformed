@@ -1,0 +1,115 @@
+---
+title: Enums & Unions
+description: EnumBuilder, UnionBuilder, and discriminated unions
+---
+
+## Enum Builder
+
+`w.enum()` creates a schema that validates against a fixed set of string values.
+
+```ts
+const status = w.enum(["active", "inactive", "pending"] as const);
+```
+
+Use `as const` to preserve literal types for inference:
+
+```ts
+import type { Infer } from "wellformed-ts";
+
+const role = w.enum(["admin", "user", "viewer"] as const);
+type Role = Infer<typeof role>;
+// "admin" | "user" | "viewer"
+```
+
+Without `as const`, the inferred type is `string`.
+
+### Validation
+
+```ts
+import { validate } from "wellformed-ts";
+
+const schema = w.enum(["A", "B", "C"] as const).toSchema("1.0");
+
+validate(schema, "A"); // valid: true
+validate(schema, "D"); // valid: false, code: "INVALID_ENUM"
+```
+
+## Union Builder
+
+`w.union()` creates a schema that matches one of several variant schemas.
+
+```ts
+const stringOrNumber = w.union([w.string(), w.number()]);
+```
+
+The validator tries each variant in order and accepts the first one that passes.
+
+### Type Inference
+
+```ts
+import type { Infer } from "wellformed-ts";
+
+const schema = w.union([
+  w.string(),
+  w.integer(),
+  w.boolean(),
+]);
+
+type T = Infer<typeof schema>;
+// string | number | boolean
+```
+
+### Object Variants
+
+Unions are especially useful with object variants:
+
+```ts
+const individual = w.object({
+  type: w.enum(["individual"] as const),
+  ssn: w.string().ssn(),
+  name: w.string(),
+});
+
+const business = w.object({
+  type: w.enum(["business"] as const),
+  ein: w.string().ein(),
+  companyName: w.string(),
+});
+
+const taxpayer = w.union([individual, business]);
+```
+
+### Discriminated Unions
+
+Use `.discriminator()` to specify the field that distinguishes variants:
+
+```ts
+const event = w.union([
+  w.object({
+    kind: w.enum(["click"] as const),
+    x: w.number(),
+    y: w.number(),
+  }),
+  w.object({
+    kind: w.enum(["keypress"] as const),
+    key: w.string(),
+  }),
+]).discriminator("kind");
+```
+
+The discriminator field is serialized into the IR as metadata. The current TypeScript and Rust runtimes still try variants in order and accept the first variant that validates.
+
+### Validation
+
+```ts
+import { validate } from "wellformed-ts";
+
+const schema = w.union([
+  w.object({ type: w.enum(["a"] as const), value: w.string() }),
+  w.object({ type: w.enum(["b"] as const), value: w.number() }),
+]).toSchema("1.0");
+
+validate(schema, { type: "a", value: "hello" }); // valid: true
+validate(schema, { type: "b", value: 42 });       // valid: true
+validate(schema, { type: "c", value: null });      // valid: false, code: "INVALID_UNION"
+```

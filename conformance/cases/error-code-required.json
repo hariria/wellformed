@@ -1,0 +1,14 @@
+{
+  "name": "error-code-required",
+  "note": "M1: a missing required field emits the same stable code in both runtimes. Rust previously emitted REQUIRED_FIELD_MISSING vs TS REQUIRED; now unified to REQUIRED.",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "object",
+      "properties": { "name": { "type": "string" } }
+    }
+  },
+  "input": {},
+  "expect": { "valid": false, "code": "REQUIRED" },
+  "status": "agree"
+}

@@ -1,0 +1,6 @@
+[workspace]
+dependencies_update = false
+pr_branch_prefix = "release-plz-"
+pr_labels = ["release"]
+release_always = false
+repo_url = "https://github.com/hariria/wellformed"

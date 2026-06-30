@@ -1,0 +1,17 @@
+{
+  "version": "1.0",
+  "root": {
+    "type": "object",
+    "properties": {
+      "email": {
+        "type": "string",
+        "constraints": [
+          {
+            "pred": { "type": "call", "name": "is_email" },
+            "error": { "code": "EMAIL", "message": "email" }
+          }
+        ]
+      }
+    }
+  }
+}

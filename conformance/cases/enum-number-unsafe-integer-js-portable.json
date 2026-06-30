@@ -1,0 +1,18 @@
+{
+  "name": "enum-number-unsafe-integer-js-portable",
+  "note": "Portable JSON number semantics follow TypeScript/JavaScript numbers. Unsafe integers beyond 2^53 may collapse to the same numeric value, so exact identifiers should be strings.",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "enum",
+      "values": [
+        9007199254740992
+      ]
+    }
+  },
+  "input": 9007199254740993,
+  "expect": {
+    "valid": true
+  },
+  "status": "agree"
+}

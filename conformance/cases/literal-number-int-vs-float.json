@@ -1,0 +1,16 @@
+{
+  "name": "literal-number-int-vs-float",
+  "note": "C3 (literal variant): input 100.0 against literal 100. TS matches numerically; Rust rejects on Number-variant inequality. Target: numeric equality (valid).",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "literal",
+      "value": 100
+    }
+  },
+  "input": 100.0,
+  "expect": {
+    "valid": true
+  },
+  "status": "agree"
+}

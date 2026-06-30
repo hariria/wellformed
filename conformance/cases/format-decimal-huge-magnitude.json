@@ -1,0 +1,12 @@
+{
+  "name": "format-decimal-huge-magnitude",
+  "note": "Documented out-of-domain divergence: at magnitude >= 1e21 JS renders integers in exponential notation while Rust stays full-decimal. Far beyond any realistic money/decimal value (see FAQ: huge numbers). Pinned until/unless closed.",
+  "schema": { "version": "1.0", "root": { "type": "string", "transforms": [{ "fn": "format_decimal", "places": 0 }] } },
+  "input": 1e21,
+  "expect": { "valid": true, "value": "1000000000000000000000" },
+  "status": "known_divergence",
+  "current": {
+    "ts": { "valid": true, "value": "1e+21" },
+    "rust": { "valid": true, "value": "1000000000000000000000" }
+  }
+}

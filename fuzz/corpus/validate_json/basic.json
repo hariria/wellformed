@@ -1,0 +1,21 @@
+{
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "transforms": [{ "fn": "trim" }, { "fn": "lower" }],
+          "constraints": [
+            {
+              "pred": { "type": "call", "name": "is_email" },
+              "error": { "code": "EMAIL", "message": "email" }
+            }
+          ]
+        }
+      }
+    }
+  },
+  "input": { "email": " ADA@EXAMPLE.COM " }
+}

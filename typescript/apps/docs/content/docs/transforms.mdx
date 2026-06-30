@@ -1,0 +1,176 @@
+---
+title: Transforms
+description: applyTransform, all transform types, and the transform pipeline
+---
+
+Transforms normalize data **before** validation constraints are evaluated. They're applied in the order they're chained on the builder.
+
+## Transform Types
+
+| Transform | Input | Output | Description |
+|-----------|-------|--------|-------------|
+| `trim` | string | string | Remove leading/trailing whitespace |
+| `collapse_whitespace` | string | string | Multiple spaces to single space + trim |
+| `digits_only` | string | string | Strip all non-digit characters |
+| `upper` | string | string | Convert to uppercase |
+| `lower` | string | string | Convert to lowercase |
+| `money_to_cents` | string/number | number | Parse money string, multiply by 10^scale |
+| `date_parse` | string | string | Parse date to canonical YYYY-MM-DD |
+| `replace` | string | string | Replace every occurrence of a literal substring |
+| `phone_us` | string | string | Normalize a US phone number to `(XXX) XXX-XXXX` when possible |
+| `phone_e164` | string | string | Normalize a phone number to E.164 when possible |
+| `format_ssn` / `format_ein` | string | string | Format 9 digits as SSN or EIN |
+| `mask_ssn` / `mask_ein` | string | string | Mask all but the trailing identifier digits |
+| `card_mask_last4` | string | string | Mask a card number except the final four digits |
+| `format_credit_card` | string | string | Group card digits in blocks of four |
+| `format_iban` | string | string | Group IBAN characters in blocks of four |
+| `format_thousands` | string/number | string | Add thousands separators |
+| `format_decimal` | string/number | string | Format to a fixed number of decimal places |
+| `normalize_flight_number` | string | string | Remove separators and uppercase flight numbers |
+| `normalize_icd10` / `normalize_cpt` / `normalize_hcpcs` / `normalize_ndc11` | string | string | Normalize healthcare code formats when possible |
+| `default` | null/undefined | any | Provide default value |
+
+## Using Transforms in Builders
+
+```ts
+// String transforms
+w.string().trim()                          // "  hello  " → "hello"
+w.string().collapseWhitespace()            // "a   b   c" → "a b c"
+w.string().digitsOnly()                    // "123-45-6789" → "123456789"
+w.string().upper()                         // "hello" → "HELLO"
+w.string().lower()                         // "HELLO" → "hello"
+w.string().replace("-", "")                // "12-34" → "1234"
+w.string().default("N/A")                  // null → "N/A"
+w.string().formatPhoneUS()                 // "4155551212" → "(415) 555-1212"
+w.string().formatPhoneE164()               // "4155551212" → "+14155551212"
+w.string().formatSsn()                     // "123456789" → "123-45-6789"
+w.string().maskSsn()                       // "123456789" → "***-**-6789"
+w.string().formatCreditCard()              // "4242424242424242" → "4242 4242 4242 4242"
+w.string().maskCardNumber()                // "4242424242424242" → "************4242"
+
+// Number defaults
+w.number().default(0)                      // null → 0
+w.integer().default(0)
+w.money().default(0)
+```
+
+## Transform Chaining
+
+Transforms execute left to right:
+
+```ts
+w.string()
+  .trim()           // "  123-45-6789  " → "123-45-6789"
+  .digitsOnly()     // "123-45-6789" → "123456789"
+  .ssn()            // Validate as SSN
+```
+
+## applyTransform()
+
+Apply a single transform programmatically:
+
+```ts
+import { applyTransform } from "wellformed-ts";
+
+applyTransform("  hello  ", { fn: "trim" });
+// "hello"
+
+applyTransform("123-45-6789", { fn: "digits_only" });
+// "123456789"
+
+applyTransform("hello", { fn: "upper" });
+// "HELLO"
+
+applyTransform("$1,234.56", { fn: "money_to_cents" });
+// 123456
+
+applyTransform("$1,234.56", { fn: "money_to_cents", scale: 3 });
+// 1234560
+
+applyTransform("01/15/2024", { fn: "date_parse", format: "MM/DD/YYYY" });
+// "2024-01-15"
+
+applyTransform("hello world", { fn: "replace", pattern: "world", replacement: "earth" });
+// "hello earth"
+
+applyTransform("4155551212", { fn: "phone_e164" });
+// "+14155551212"
+
+applyTransform("123456789", { fn: "mask_ssn" });
+// "***-**-6789"
+
+applyTransform("4242424242424242", { fn: "format_credit_card" });
+// "4242 4242 4242 4242"
+
+applyTransform(1234.5, { fn: "format_decimal", places: 2 });
+// "1234.50"
+
+applyTransform(null, { fn: "default", value: "fallback" });
+// "fallback"
+```
+
+## applyTransforms()
+
+Apply multiple transforms in sequence:
+
+```ts
+import { applyTransforms } from "wellformed-ts";
+
+applyTransforms("  $1,234.56  ", [
+  { fn: "trim" },
+  { fn: "money_to_cents" },
+]);
+// 123456
+```
+
+## money_to_cents
+
+Converts a money string (or number) to an integer in the smallest currency unit:
+
+```ts
+// String input: strips $, commas, parses float, multiplies by 10^scale
+applyTransform("$1,234.56", { fn: "money_to_cents" });          // 123456
+applyTransform("$1,234.56", { fn: "money_to_cents", scale: 2 }); // 123456 (default)
+applyTransform("$1,234.56", { fn: "money_to_cents", scale: 0 }); // 1235
+
+// Number input: multiplies directly
+applyTransform(1234.56, { fn: "money_to_cents" });               // 123456
+```
+
+## date_parse
+
+Parses dates from various formats to canonical `YYYY-MM-DD`:
+
+```ts
+applyTransform("01/15/2024", { fn: "date_parse", format: "MM/DD/YYYY" });
+// "2024-01-15"
+
+applyTransform("01-15-2024", { fn: "date_parse", format: "MM-DD-YYYY" });
+// "2024-01-15"
+
+applyTransform("01152024", { fn: "date_parse", format: "MMDDYYYY" });
+// "2024-01-15"
+
+applyTransform("2024-01-15", { fn: "date_parse", format: "YYYY-MM-DD" });
+// "2024-01-15" (already canonical)
+```
+
+## Transforms in the IR
+
+In the serialized JSON IR, transforms are stored as an array on each field:
+
+```json
+{
+  "type": "string",
+  "transforms": [
+    { "fn": "trim" },
+    { "fn": "digits_only" }
+  ],
+  "constraints": [...]
+}
+```
+
+The `fn` field identifies the transform type, matching the Rust crate's
+`#[serde(tag = "fn")]` format. Treat each transform name as a stable output
+contract. Faster internals are fine when the normalized value stays the same;
+output-changing behavior should use a new transform name or an explicit option.

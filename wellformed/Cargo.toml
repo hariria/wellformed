@@ -1,0 +1,45 @@
+[package]
+name = "wellformed"
+version = "0.1.1"
+edition = "2021"
+rust-version = "1.93.0"
+description = "Declarative form validation schemas with transforms, constraints, and codegen"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/hariria/wellformed"
+homepage = "https://wellformed.net"
+documentation = "https://docs.rs/wellformed"
+keywords = ["validation", "schema", "forms", "serde"]
+categories = ["data-structures", "development-tools"]
+
+[package.metadata.docs.rs]
+no-default-features = true
+features = []
+
+[features]
+default = []
+address = ["dep:postal"]
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+regex = "1"
+memchr = "2"
+indexmap = { version = "2", features = ["serde"] }
+quote = "1"
+proc-macro2 = "1"
+postal = { version = "0.2.6", optional = true }
+
+# Shared validation primitives
+wellformed-validate = { version = "0.1.0", path = "../wellformed-validate" }
+
+rayon = "1.11.0"
+
+[dev-dependencies]
+serial_test = "3"
+proptest = "1"
+
+[[bench]]
+name = "predicates"
+harness = false

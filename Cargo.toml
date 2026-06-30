@@ -1,0 +1,18 @@
+[workspace]
+members = [
+    "wellformed",
+    "wellformed-validate",
+    "wellformed-macros",
+]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+license = "MIT"
+rust-version = "1.93.0"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"

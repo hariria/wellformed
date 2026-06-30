@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2](https://github.com/hariria/wellformed/compare/wellformed-v0.1.1...wellformed-v0.1.2) - 2026-06-30
+
+### Other
+
+- updated the following local packages: wellformed-validate
+
 ## [0.1.1](https://github.com/hariria/wellformed/compare/wellformed-v0.1.0...wellformed-v0.1.1) - 2026-06-30
 
 ### Added

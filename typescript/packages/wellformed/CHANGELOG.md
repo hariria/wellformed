@@ -1,5 +1,11 @@
 # wellformed-ts
 
+## 0.1.2
+
+### Patch Changes
+
+- transform and validate updates and tests + fuzzing
+
 ## 0.1.1
 
 ### Patch Changes

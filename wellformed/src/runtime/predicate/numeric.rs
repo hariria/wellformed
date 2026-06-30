@@ -63,6 +63,9 @@ fn extract_integer(value: &Value) -> Option<i128> {
             if let Ok(i) = s.parse::<i128>() {
                 return Some(i);
             }
+            if is_plain_integer_string(s) {
+                return None;
+            }
             // Try as float, check it's whole
             if let Ok(f) = s.parse::<f64>() {
                 if f.fract() == 0.0 && f.is_finite() {
@@ -73,6 +76,11 @@ fn extract_integer(value: &Value) -> Option<i128> {
         }
         _ => None,
     }
+}
+
+fn is_plain_integer_string(s: &str) -> bool {
+    let rest = s.strip_prefix(['+', '-']).unwrap_or(s);
+    !rest.is_empty() && rest.bytes().all(|b| b.is_ascii_digit())
 }
 
 // ============================================================================
@@ -158,6 +166,9 @@ impl NamedPredicate for U64Predicate {
                 if s.parse::<u64>().is_ok() {
                     return true;
                 }
+                if is_plain_integer_string(s) {
+                    return false;
+                }
                 // Try as float
                 if let Ok(f) = s.parse::<f64>() {
                     return f.fract() == 0.0 && f >= 0.0 && f <= u64::MAX as f64;
@@ -199,6 +210,9 @@ impl NamedPredicate for I64Predicate {
                 let s = s.trim();
                 if s.parse::<i64>().is_ok() {
                     return true;
+                }
+                if is_plain_integer_string(s) {
+                    return false;
                 }
                 if let Ok(f) = s.parse::<f64>() {
                     return f.fract() == 0.0 && f >= i64::MIN as f64 && f <= i64::MAX as f64;
@@ -292,6 +306,7 @@ mod tests {
 
         assert!(!eval(&p, json!(-1)));
         assert!(!eval(&p, json!("-1")));
+        assert!(!eval(&p, json!("18446744073709551616")));
         assert!(!eval(&p, json!(1.25)));
     }
 
@@ -334,6 +349,8 @@ mod tests {
         assert!(eval(&p, json!(0)));
 
         assert!(!eval(&p, json!(18446744073709551615_u64))); // u64::MAX > i64::MAX
+        assert!(!eval(&p, json!("9223372036854775808")));
+        assert!(!eval(&p, json!("-9223372036854775809")));
         assert!(!eval(&p, json!(1.25)));
     }
 

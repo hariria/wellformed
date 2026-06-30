@@ -3,7 +3,7 @@
 //! This module implements the runtime execution of transforms.
 //! Transforms are applied in order and modify values in place.
 
-use crate::error::{Result, WelError};
+use crate::error::Result;
 use crate::ir::Transform;
 use serde_json::Value;
 
@@ -255,12 +255,12 @@ pub fn apply_transform(value: &mut Value, transform: &Transform, path: &str) -> 
                         .filter(|c| c.is_ascii_digit() || *c == '.' || *c == '-')
                         .collect();
                     if let Ok(f) = cleaned.parse::<f64>() {
-                        *s = format!("{:.prec$}", f, prec = *places as usize);
+                        *s = format_decimal_places(f, *places as usize);
                     }
                 }
                 Value::Number(n) => {
                     if let Some(f) = n.as_f64() {
-                        *value = Value::String(format!("{:.prec$}", f, prec = *places as usize));
+                        *value = Value::String(format_decimal_places(f, *places as usize));
                     }
                 }
                 _ => {}
@@ -268,6 +268,44 @@ pub fn apply_transform(value: &mut Value, transform: &Transform, path: &str) -> 
         }
     }
     Ok(())
+}
+
+/// Format `f` to `places` decimals using the same multiply-then-round model as
+/// `money_to_cents`, then build the decimal string from the rounded integer.
+///
+/// This is deterministic across runtimes: both TS and Rust compute
+/// `round_half_away(f * 10^places)` with identical IEEE-754 ops, then render the
+/// integer the same way. We deliberately do NOT mirror JS `Number.toFixed`,
+/// which uses a different (true-value) rounding model and would make
+/// `format_decimal` disagree with `money_to_cents` inside a single runtime.
+/// The TypeScript runtime uses the same algorithm. See conformance:
+/// format-decimal-half-rounding.
+fn format_decimal_places(f: f64, places: usize) -> String {
+    if !f.is_finite() {
+        // Match JS: non-finite renders via the default float formatting.
+        return f.to_string();
+    }
+    let factor = 10f64.powi(places as i32);
+    // f64::round is half-away-from-zero. Build the string from this integer so
+    // there is no second float-formatting step to diverge on.
+    let scaled = (f * factor).round();
+    let negative = scaled.is_sign_negative() && scaled != 0.0;
+    let magnitude = scaled.abs();
+
+    if places == 0 {
+        return format!("{}{}", if negative { "-" } else { "" }, magnitude);
+    }
+
+    // magnitude is an integer-valued f64; split into integer and fractional digits.
+    let int_part = (magnitude / factor).floor();
+    let frac_part = magnitude - int_part * factor;
+    format!(
+        "{}{}.{:0>width$}",
+        if negative { "-" } else { "" },
+        int_part,
+        frac_part as u64,
+        width = places
+    )
 }
 
 /// Collapse multiple whitespace characters into single spaces.
@@ -421,35 +459,25 @@ fn normalize_ndc11_code(input: &str) -> Option<String> {
 }
 
 /// Convert a money string to cents (integer).
-fn apply_money_to_cents(value: &mut Value, scale: u8, path: &str) -> Result<()> {
+fn apply_money_to_cents(value: &mut Value, scale: u8, _path: &str) -> Result<()> {
+    // Transforms are non-fatal, matching the TypeScript runtime: on an
+    // unparseable/out-of-range input the value is left unchanged so the
+    // subsequent type check reports an in-band TYPE_ERROR (rather than aborting
+    // the whole validate() call with an out-of-band Err).
     let cents = match value {
-        Value::String(s) => {
-            parse_money_string(s, scale).ok_or_else(|| WelError::TransformFailed {
-                path: path.to_string(),
-                message: format!("invalid money format: {s}"),
-            })?
-        }
-        Value::Number(n) => {
-            if let Some(f) = n.as_f64() {
+        Value::String(s) => match parse_money_string(s, scale) {
+            Some(cents) => cents,
+            None => return Ok(()),
+        },
+        Value::Number(n) => match n.as_f64() {
+            Some(f) => {
                 let multiplier = 10_f64.powi(scale as i32);
                 (f * multiplier).round() as i64
-            } else {
-                return Err(WelError::TransformFailed {
-                    path: path.to_string(),
-                    message: "number out of range".to_string(),
-                });
             }
-        }
-        Value::Null => return Ok(()), // Leave null as null
-        _ => {
-            return Err(WelError::TransformFailed {
-                path: path.to_string(),
-                message: format!(
-                    "expected string or number, got {:?}",
-                    value_type_name(value)
-                ),
-            })
-        }
+            None => return Ok(()),
+        },
+        // Null and any other type: leave unchanged for the type check to handle.
+        _ => return Ok(()),
     };
 
     *value = Value::Number(cents.into());
@@ -480,21 +508,17 @@ fn parse_money_string(s: &str, scale: u8) -> Option<i64> {
 }
 
 /// Parse a date string and convert to canonical format (YYYY-MM-DD).
-fn apply_date_parse(value: &mut Value, format: &str, path: &str) -> Result<()> {
+fn apply_date_parse(value: &mut Value, format: &str, _path: &str) -> Result<()> {
     if let Value::String(s) = value {
         if s.is_empty() {
             return Ok(());
         }
 
-        // For now, we support a few common formats
-        // A full implementation would use chrono's strptime
-        let canonical =
-            parse_date_with_format(s, format).ok_or_else(|| WelError::TransformFailed {
-                path: path.to_string(),
-                message: format!("invalid date format: {s} (expected {format})"),
-            })?;
-
-        *s = canonical;
+        // Non-fatal, matching TypeScript: an unparseable date is left unchanged
+        // so the type/constraint check reports it in-band.
+        if let Some(canonical) = parse_date_with_format(s, format) {
+            *s = canonical;
+        }
     }
     Ok(())
 }
@@ -619,18 +643,6 @@ fn format_with_thousands(s: &str, separator: &str) -> Option<String> {
     }
 
     Some(formatted)
-}
-
-/// Get a human-readable name for a JSON value type.
-fn value_type_name(value: &Value) -> &'static str {
-    match value {
-        Value::Null => "null",
-        Value::Bool(_) => "boolean",
-        Value::Number(_) => "number",
-        Value::String(_) => "string",
-        Value::Array(_) => "array",
-        Value::Object(_) => "object",
-    }
 }
 
 #[cfg(test)]
@@ -766,7 +778,10 @@ mod tests {
     }
 
     #[test]
-    fn test_date_parse_rejects_invalid_calendar_dates() {
+    fn test_date_parse_leaves_invalid_calendar_dates_unchanged() {
+        // Transforms are non-fatal (matching the TS runtime): an invalid date is
+        // left unchanged so a downstream type/constraint check rejects it in-band,
+        // rather than aborting validate() with an out-of-band Err.
         let mut value = json!("02/31/2024");
         let result = apply_transform(
             &mut value,
@@ -775,7 +790,7 @@ mod tests {
             },
             "",
         );
-        assert!(result.is_err());
+        assert!(result.is_ok());
         assert_eq!(value, json!("02/31/2024"));
     }
 

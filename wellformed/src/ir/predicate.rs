@@ -210,8 +210,12 @@ impl TemplateConstraint {
                     values: values.clone(),
                 },
                 error: ErrorMeta {
-                    code: "INVALID_ENUM_VALUE".to_string(),
-                    message: message.unwrap_or_else(|| format!("Must be one of: {:?}", values)),
+                    code: "INVALID_ENUM".to_string(),
+                    message: message.unwrap_or_else(|| {
+                        let values_json =
+                            serde_json::to_string(&values).unwrap_or_else(|_| "[]".to_string());
+                        format!("Must be one of: {values_json}")
+                    }),
                     path: None,
                     severity: ErrorSeverity::Error,
                     help: None,

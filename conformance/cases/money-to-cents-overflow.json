@@ -1,0 +1,12 @@
+{
+  "name": "money-to-cents-overflow",
+  "note": "OPEN divergence (M4 part 2): money_to_cents overflow handling differs. Rust saturates to i64::MAX; TS produces a large float. Rounding is fixed; overflow is not. Pinned until resolved.",
+  "schema": { "version": "1.0", "root": { "type": "number", "transforms": [{ "fn": "money_to_cents", "scale": 2 }] } },
+  "input": 1e21,
+  "expect": { "valid": true, "value": 1e23 },
+  "status": "known_divergence",
+  "current": {
+    "ts": { "valid": true, "value": 1e23 },
+    "rust": { "valid": true, "value": 9223372036854775807 }
+  }
+}

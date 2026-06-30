@@ -38,6 +38,7 @@ rayon = "1.11.0"
 
 [dev-dependencies]
 serial_test = "3"
+proptest = "1"
 
 [[bench]]
 name = "predicates"

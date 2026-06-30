@@ -212,6 +212,26 @@ describe("validate", () => {
       ]);
     });
 
+    it("preserves empty object keys in nested error paths", () => {
+      const schema: TypeSchema = {
+        type: "object",
+        properties: {
+          "": {
+            type: "tuple",
+            items: [{ type: "number" }, { type: "number" }],
+          },
+        },
+      };
+
+      const result = validate(schema, { "": [false, "0"] });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toMatchObject([
+        { code: "TYPE_ERROR", path: "//0" },
+        { code: "TYPE_ERROR", path: "//1" },
+      ]);
+    });
+
     it("evaluates cross-field rules", () => {
       const schema = w
         .object({
@@ -299,6 +319,7 @@ describe("validate", () => {
       });
       expect(result.valid).toBe(false);
       expect(result.errors[0]?.code).toBe("ADDITIONAL_PROPERTY_NOT_ALLOWED");
+      expect((result.value as { extra: string }).extra).toBe("x");
     });
 
     it("keeps unknown keys in passthrough mode", () => {
@@ -406,10 +427,10 @@ describe("validate", () => {
       } as const;
 
       expect(validate(schema, []).errors).toMatchObject([
-        { code: "ARRAY_TOO_SHORT", path: "/" },
+        { code: "ARRAY_TOO_SHORT", path: "" },
       ]);
       expect(validate(schema, ["a", "b", "c"]).errors).toMatchObject([
-        { code: "ARRAY_TOO_LONG", path: "/" },
+        { code: "ARRAY_TOO_LONG", path: "" },
       ]);
       expect(validate(schema, ["a"]).valid).toBe(true);
     });
@@ -573,6 +594,27 @@ describe("validate", () => {
         { code: "TYPE_ERROR", path: "/a~1b~0c" },
       ]);
     });
+
+    it("preserves empty record keys in key validation paths", () => {
+      const schema: TypeSchema = {
+        type: "record",
+        key: {
+          type: "string",
+          constraints: [
+            {
+              pred: { type: "min_len", len: 1 },
+              error: { code: "KEY", message: "key required" },
+            },
+          ],
+        },
+        value: { type: "number" },
+      };
+
+      const result = validate(schema, { "": 1 });
+
+      expect(result.valid).toBe(false);
+      expect(result.errors).toMatchObject([{ code: "KEY", path: "//$key" }]);
+    });
   });
 
   describe("preprocess/catch validation", () => {
@@ -638,6 +680,7 @@ describe("validate", () => {
       expect(result.errors).toMatchObject([
         { code: "REQUIRED", path: "/name" },
       ]);
+      expect(result.value).toEqual({ name: null });
     });
 
     it("allows null for required nullable object fields", () => {
@@ -765,7 +808,7 @@ describe("schema references", () => {
     const result = validate(schema, "value");
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toMatchObject([{ code: "REF_NOT_FOUND", path: "/" }]);
+    expect(result.errors).toMatchObject([{ code: "REF_NOT_FOUND", path: "" }]);
   });
 
   it("reports cyclic references", () => {
@@ -781,7 +824,7 @@ describe("schema references", () => {
     const result = validate(schema, "value");
 
     expect(result.valid).toBe(false);
-    expect(result.errors).toMatchObject([{ code: "REF_CYCLE", path: "/" }]);
+    expect(result.errors).toMatchObject([{ code: "REF_CYCLE", path: "" }]);
   });
 });
 

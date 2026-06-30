@@ -10,7 +10,7 @@ import type {
   Transform,
   TypeSchema,
 } from "../ir/types.js";
-import { joinPointers, toPointer } from "./pointer.js";
+import { toPointer } from "./pointer.js";
 import { createEvalContext, type EvalContext, evaluate } from "./predicate.js";
 import { applyTransforms } from "./transform.js";
 
@@ -41,6 +41,14 @@ interface RuntimeValidationContext {
   definitions?: Record<string, TypeSchema>;
   refStack: string[];
 }
+
+/**
+ * Maximum `$ref` recursion depth. Bounds runaway/cyclic schemas so they error
+ * cleanly instead of recursing forever, while still allowing legitimate
+ * recursive schemas over finite data to validate. Mirrors the Rust runtime's
+ * validation-depth bound.
+ */
+const MAX_REF_DEPTH = 128;
 
 const defaultEvalContext = createEvalContext();
 
@@ -1182,6 +1190,7 @@ function validateObject(
       propValue === null &&
       !schemaAllowsNull(propSchema as TypeSchema, runtime)
     ) {
+      result[propName] = propValue;
       addError(errors, propPath, "REQUIRED", `${propName} is required`);
       continue;
     }
@@ -1224,6 +1233,7 @@ function validateObject(
       }
 
       if (unknownBehavior === "strict") {
+        result[key] = obj[key];
         addError(
           errors,
           propPath,
@@ -1290,7 +1300,7 @@ function validateArray(
   // Validate each item
   const result: unknown[] = [];
   for (let i = 0; i < value.length; i++) {
-    const itemPath = joinPointers(path, `/${i}`);
+    const itemPath = joinPathSegment(path, String(i));
     result.push(
       validateTypeSchema(
         schema.items,
@@ -1364,7 +1374,7 @@ function validateTuple(
   const result: unknown[] = [];
   const count = Math.min(value.length, schema.items.length);
   for (let i = 0; i < count; i++) {
-    const itemPath = joinPointers(path, `/${i}`);
+    const itemPath = joinPathSegment(path, String(i));
     result.push(
       validateTypeSchema(
         schema.items[i] as TypeSchema,
@@ -1556,7 +1566,7 @@ function validateRecord(
     const itemPath = joinPathSegment(path, key);
 
     if (schema.key) {
-      const keyPath = joinPointers(itemPath, "/$key");
+      const keyPath = joinPathSegment(itemPath, "$key");
       validateTypeSchema(
         schema.key,
         key,
@@ -1663,12 +1673,17 @@ function validateRef(
     return value;
   }
 
-  if (runtime.refStack.includes(schema.$ref)) {
+  // Bound recursion by depth rather than name membership. A recursive schema
+  // over finite data (e.g. a linked list or tree) re-enters the same $ref as it
+  // descends, which is legitimate and must validate; only unbounded recursion (a
+  // true cycle that consumes no data) is an error. This mirrors the Rust runtime,
+  // which bounds total validation depth. See conformance: recursive-ref-schema.
+  if (runtime.refStack.length >= MAX_REF_DEPTH) {
     addError(
       errors,
       path,
       "REF_CYCLE",
-      `Schema reference cycle detected: ${[
+      `Schema reference recursion limit (${MAX_REF_DEPTH}) exceeded (possible cycle): ${[
         ...runtime.refStack,
         schema.$ref,
       ].join(" -> ")}`,
@@ -1735,13 +1750,14 @@ function addError(
   errors.push({
     code,
     message,
-    path: path || "/",
+    path,
     severity: "error",
   });
 }
 
 function joinPathSegment(base: string, segment: string): string {
-  return joinPointers(base, toPointer([segment]));
+  const child = toPointer([segment]);
+  return base === "" ? child : `${base}${child}`;
 }
 
 function isEqualValue(a: unknown, b: unknown): boolean {

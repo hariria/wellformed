@@ -33,9 +33,10 @@ pub enum WelError {
     #[error("unknown predicate: {0}")]
     UnknownPredicate(String),
 
-    /// Schema reference not found.
-    #[error("schema reference not found: {0}")]
-    RefNotFound(String),
+    /// Maximum validation recursion depth exceeded (cyclic or pathologically
+    /// nested schema/data). Returned instead of overflowing the stack.
+    #[error("maximum validation depth exceeded at {0}")]
+    RecursionLimit(String),
 
     /// JSON serialization/deserialization error.
     #[error("JSON error: {0}")]

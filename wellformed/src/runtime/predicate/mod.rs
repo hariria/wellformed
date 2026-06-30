@@ -167,6 +167,7 @@ mod address;
 use crate::error::{Result, WelError};
 use crate::ir::{Predicate, TemplateLiteralPart};
 use crate::path::JsonPointer;
+use crate::runtime::validate::json_value_eq;
 use memchr::memchr;
 use regex::Regex;
 use serde_json::Value;
@@ -276,16 +277,23 @@ impl PredicateRegistry {
 // Evaluation Context
 // ============================================================================
 
+/// Maximum predicate-tree recursion depth. Bounds the boolean combinators
+/// (`and`/`or`/`not`/`implies`) so a deeply nested predicate returns a clean
+/// error instead of overflowing the stack (a DoS vector).
+const MAX_PREDICATE_DEPTH: usize = 128;
+
 /// Context for predicate evaluation.
 pub struct EvalContext<'a> {
     /// Registry of named predicates.
     pub registry: &'a PredicateRegistry,
+    /// Current predicate-tree recursion depth.
+    depth: usize,
 }
 
 impl<'a> EvalContext<'a> {
     /// Create a new evaluation context.
     pub fn new(registry: &'a PredicateRegistry) -> Self {
-        Self { registry }
+        Self { registry, depth: 0 }
     }
 }
 
@@ -347,6 +355,17 @@ fn compile_regex(pattern: &str, flags: Option<&str>) -> Result<Regex> {
 /// The value is the "current" value being validated (at the constraint's scope).
 /// Path-based predicates use relative JSON Pointer paths from this value.
 pub fn evaluate(pred: &Predicate, value: &Value, ctx: &mut EvalContext) -> Result<bool> {
+    ctx.depth += 1;
+    if ctx.depth > MAX_PREDICATE_DEPTH {
+        ctx.depth -= 1;
+        return Err(WelError::RecursionLimit("predicate".to_string()));
+    }
+    let result = evaluate_inner(pred, value, ctx);
+    ctx.depth -= 1;
+    result
+}
+
+fn evaluate_inner(pred: &Predicate, value: &Value, ctx: &mut EvalContext) -> Result<bool> {
     match pred {
         Predicate::True => Ok(true),
         Predicate::False => Ok(false),
@@ -394,13 +413,16 @@ pub fn evaluate(pred: &Predicate, value: &Value, ctx: &mut EvalContext) -> Resul
         } => {
             let ptr = JsonPointer::parse(path)?;
             let results = ptr.resolve(value);
-            Ok(!results.is_empty() && results.iter().all(|v| *v == expected))
+            Ok(!results.is_empty() && results.iter().all(|v| json_value_eq(v, expected)))
         }
 
         Predicate::In { path, values } => {
             let ptr = JsonPointer::parse(path)?;
             let results = ptr.resolve(value);
-            Ok(!results.is_empty() && results.iter().all(|v| values.contains(v)))
+            Ok(!results.is_empty()
+                && results
+                    .iter()
+                    .all(|v| values.iter().any(|x| json_value_eq(x, v))))
         }
 
         Predicate::RequiredWith { field, with } => {
@@ -438,7 +460,10 @@ pub fn evaluate(pred: &Predicate, value: &Value, ctx: &mut EvalContext) -> Resul
             Ok(!left_vals.is_empty()
                 && !right_vals.is_empty()
                 && left_vals.len() == right_vals.len()
-                && left_vals.iter().zip(right_vals.iter()).all(|(l, r)| l == r))
+                && left_vals
+                    .iter()
+                    .zip(right_vals.iter())
+                    .all(|(l, r)| json_value_eq(l, r)))
         }
 
         Predicate::GtField { left, right } => compare_fields(value, left, right, |l, r| l > r),

@@ -1,0 +1,19 @@
+{
+  "name": "string-email-valid",
+  "note": "Parity guard: a valid email passes is_email identically in both runtimes.",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "string",
+      "constraints": [
+        {
+          "pred": { "type": "call", "name": "is_email" },
+          "error": { "code": "INVALID_EMAIL", "message": "Invalid email" }
+        }
+      ]
+    }
+  },
+  "input": "ada@example.com",
+  "expect": { "valid": true },
+  "status": "agree"
+}

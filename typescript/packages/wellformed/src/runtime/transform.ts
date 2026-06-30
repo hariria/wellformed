@@ -6,6 +6,40 @@
 import type { Transform } from "../ir/types.js";
 
 /**
+ * Round half away from zero (so -2.5 -> -3, matching the Rust runtime's
+ * f64::round). JavaScript's Math.round rounds half toward +Infinity
+ * (-2.5 -> -2), which would diverge across runtimes for negative money values.
+ * See conformance: money-to-cents-negative-half.
+ */
+function roundTiesAwayFromZero(n: number): number {
+  return Math.sign(n) * Math.round(Math.abs(n));
+}
+
+/**
+ * Format `f` to `places` decimals using the same multiply-then-round model as
+ * money_to_cents, then build the string from the rounded integer. This is
+ * deterministic across runtimes (the Rust runtime uses the identical algorithm)
+ * and keeps format_decimal consistent with money_to_cents within a runtime. We
+ * deliberately do NOT use Number.toFixed, whose true-value rounding model would
+ * disagree with both. See conformance: format-decimal-half-rounding.
+ */
+function formatDecimalPlaces(f: number, places: number): string {
+  if (!Number.isFinite(f)) {
+    return String(f);
+  }
+  const factor = 10 ** places;
+  const scaled = roundTiesAwayFromZero(f * factor);
+  const negative = scaled < 0;
+  const magnitude = Math.abs(scaled);
+  if (places === 0) {
+    return `${negative ? "-" : ""}${magnitude}`;
+  }
+  const intPart = Math.floor(magnitude / factor);
+  const fracPart = magnitude - intPart * factor;
+  return `${negative ? "-" : ""}${intPart}.${String(fracPart).padStart(places, "0")}`;
+}
+
+/**
  * Apply a single transform to a value.
  */
 export function applyTransform(value: unknown, transform: Transform): unknown {
@@ -14,7 +48,7 @@ export function applyTransform(value: unknown, transform: Transform): unknown {
     // Handle money_to_cents for numbers
     if (transform.fn === "money_to_cents" && typeof value === "number") {
       const scale = transform.scale ?? 2;
-      return Math.round(value * 10 ** scale);
+      return roundTiesAwayFromZero(value * 10 ** scale);
     }
     // Handle default for null/undefined
     if (transform.fn === "default" && (value === null || value === undefined)) {
@@ -27,7 +61,7 @@ export function applyTransform(value: unknown, transform: Transform): unknown {
     }
     // Handle format_decimal for numbers
     if (transform.fn === "format_decimal" && typeof value === "number") {
-      return value.toFixed(transform.places);
+      return formatDecimalPlaces(value, transform.places ?? 0);
     }
     return value;
   }
@@ -55,7 +89,7 @@ export function applyTransform(value: unknown, transform: Transform): unknown {
       if (num === null) {
         return value; // Can't parse, return as-is
       }
-      return Math.round(num * 10 ** scale);
+      return roundTiesAwayFromZero(num * 10 ** scale);
     }
 
     case "date_parse": {
@@ -209,7 +243,7 @@ export function applyTransform(value: unknown, transform: Transform): unknown {
       const cleaned = cleanNumberString(value);
       const num = parseStrictFiniteNumber(cleaned);
       if (num === null) return value;
-      return num.toFixed(transform.places);
+      return formatDecimalPlaces(num, transform.places ?? 0);
     }
 
     default:

@@ -1,0 +1,14 @@
+{
+  "name": "format-decimal-half-rounding",
+  "note": "C4: format_decimal rounds half-away-from-zero in both runtimes using the portable multiply-then-round model. 2.5 -> '3' at 0 places. Rust previously used banker's rounding -> '2'.",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "string",
+      "transforms": [{ "fn": "format_decimal", "places": 0 }]
+    }
+  },
+  "input": "2.5",
+  "expect": { "valid": true, "value": "3" },
+  "status": "agree"
+}

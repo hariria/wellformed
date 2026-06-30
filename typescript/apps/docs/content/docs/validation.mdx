@@ -215,7 +215,7 @@ const user = w.object({
 
 Every builder call creates a new instance, and the parent always outlives its children. The resulting schema tree is acyclic by construction.
 
-The IR includes a `ref` type (`{ type: "ref", $ref: string }`) for reusable definitions. This is the one mechanism that *could* introduce cycles in a deserialized schema (e.g., `A` references `B` which references `A`). The TypeScript runtime resolves references through top-level `definitions` and reports `REF_NOT_FOUND` or `REF_CYCLE` instead of accepting unvalidated values.
+The IR includes a `ref` type (`{ type: "ref", $ref: string }`) for reusable definitions. This is the one mechanism that *could* introduce cycles in a deserialized schema (e.g., `A` references `B` which references `A`). The runtimes resolve references through top-level `definitions` and report `REF_NOT_FOUND` or `REF_CYCLE` instead of accepting unvalidated values.
 
 ### No Inter-Field Dependencies
 

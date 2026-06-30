@@ -234,6 +234,7 @@ describe("JSON serialization", () => {
             constraints: [
               { type: "minLength", value: 2, source: "iris" },
               { type: "format", value: "decimal-2" },
+              { type: "enum", value: ["A", "B"] },
             ],
           },
         }),
@@ -254,6 +255,14 @@ describe("JSON serialization", () => {
           error: {
             code: "FORMAT_INVALID",
             message: "Must be in decimal-2 format",
+            severity: "error",
+          },
+        },
+        {
+          pred: { type: "in", path: "", values: ["A", "B"] },
+          error: {
+            code: "INVALID_ENUM",
+            message: 'Must be one of: ["A","B"]',
             severity: "error",
           },
         },

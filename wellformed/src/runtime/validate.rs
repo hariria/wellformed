@@ -3,7 +3,7 @@
 //! This module implements the main validation logic that combines
 //! transforms, type checking, and constraint evaluation.
 
-use crate::error::{Result, WelError};
+use crate::error::Result;
 use crate::ir::{
     ArraySchema, CatchSchema, Constraint, CurrencySchema, DateSchema, DecimalSchema, EnumSchema,
     FormError, Int32Schema, Int64Schema, IntegerSchema, IntersectionSchema, LiteralSchema,
@@ -56,16 +56,27 @@ impl ValidationResult {
     }
 }
 
+/// Maximum schema/data recursion depth. Bounds both deeply nested input and
+/// recursive `$ref` schemas so a cyclic or pathological schema returns a clean
+/// error instead of overflowing the stack (a DoS vector). See conformance:
+/// recursive-ref-schema.
+const MAX_VALIDATION_DEPTH: usize = 128;
+
 /// Validator for executing schema validation.
 pub struct Validator<'a> {
     schema: &'a Schema,
     registry: &'a PredicateRegistry,
+    depth: std::cell::Cell<usize>,
 }
 
 impl<'a> Validator<'a> {
     /// Create a new validator.
     pub fn new(schema: &'a Schema, registry: &'a PredicateRegistry) -> Self {
-        Self { schema, registry }
+        Self {
+            schema,
+            registry,
+            depth: std::cell::Cell::new(0),
+        }
     }
 
     /// Validate a value against the schema's root type.
@@ -84,7 +95,21 @@ impl<'a> Validator<'a> {
         path: &str,
         ctx: &mut EvalContext,
     ) -> Result<ValidationResult> {
-        match type_schema {
+        let depth = self.depth.get() + 1;
+        if depth > MAX_VALIDATION_DEPTH {
+            // In-band (valid:false), matching the TypeScript runtime's channel for
+            // a cyclic/over-deep schema rather than aborting with an Err. The
+            // depth has not been incremented yet, so there is nothing to restore.
+            let mut result = ValidationResult::new();
+            result.add_error(FormError::new(
+                "MAX_DEPTH_EXCEEDED",
+                format!("maximum validation depth ({MAX_VALIDATION_DEPTH}) exceeded"),
+                path,
+            ));
+            return Ok(result);
+        }
+        self.depth.set(depth);
+        let result = match type_schema {
             TypeSchema::String(schema) => self.validate_string(schema, value, path, ctx),
             TypeSchema::Number(schema) => self.validate_number(schema, value, path, ctx),
             TypeSchema::Integer(schema) => self.validate_integer(schema, value, path, ctx),
@@ -113,7 +138,9 @@ impl<'a> Validator<'a> {
             TypeSchema::Catch(schema) => self.validate_catch(schema, value, path, ctx),
             TypeSchema::Ref { name } => self.validate_ref(name, value, path, ctx),
             TypeSchema::Any(_) => Ok(ValidationResult::new()), // Any type always passes
-        }
+        };
+        self.depth.set(depth - 1);
+        result
     }
 
     fn validate_string(
@@ -131,7 +158,7 @@ impl<'a> Validator<'a> {
         // Type check (null is OK if not required - handled at object level)
         if !value.is_string() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected string, got {}", value_type_name(value)),
                 path,
             ));
@@ -159,7 +186,7 @@ impl<'a> Validator<'a> {
 
         if !value.is_number() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected number, got {}", value_type_name(value)),
                 path,
             ));
@@ -198,7 +225,7 @@ impl<'a> Validator<'a> {
 
         if !is_integer {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected integer, got {}", value_type_name(value)),
                 path,
             ));
@@ -232,7 +259,7 @@ impl<'a> Validator<'a> {
             }
             _ => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!(
                         "expected int32 ({} to {}), got {}",
                         i32::MIN,
@@ -269,7 +296,7 @@ impl<'a> Validator<'a> {
             }
             None => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!("expected int64, got {}", value_type_name(value)),
                     path,
                 ));
@@ -301,7 +328,7 @@ impl<'a> Validator<'a> {
             }
             _ => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!(
                         "expected uint32 (0 to {}), got {}",
                         u32::MAX,
@@ -337,7 +364,7 @@ impl<'a> Validator<'a> {
             }
             None => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!(
                         "expected uint64 (non-negative integer), got {}",
                         value_type_name(value)
@@ -355,7 +382,7 @@ impl<'a> Validator<'a> {
 
         if !value.is_boolean() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected boolean, got {}", value_type_name(value)),
                 path,
             ));
@@ -378,7 +405,7 @@ impl<'a> Validator<'a> {
         // Money should be a number (cents) after transforms
         if !value.is_number() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected money (number), got {}", value_type_name(value)),
                 path,
             ));
@@ -406,7 +433,7 @@ impl<'a> Validator<'a> {
         // Currency should be a number (amount)
         if !value.is_number() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected currency (number), got {}", value_type_name(value)),
                 path,
             ));
@@ -445,7 +472,7 @@ impl<'a> Validator<'a> {
         // Decimal should be a number
         if !value.is_number() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected decimal (number), got {}", value_type_name(value)),
                 path,
             ));
@@ -505,7 +532,7 @@ impl<'a> Validator<'a> {
         // Percentage should be a number
         if !value.is_number() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!(
                     "expected percentage (number), got {}",
                     value_type_name(value)
@@ -580,7 +607,7 @@ impl<'a> Validator<'a> {
 
         if !value.is_string() && !value.is_null() {
             result.add_error(FormError::new(
-                "TYPE_MISMATCH",
+                "TYPE_ERROR",
                 format!("expected date string, got {}", value_type_name(value)),
                 path,
             ));
@@ -611,7 +638,7 @@ impl<'a> Validator<'a> {
             Some(obj) => obj,
             None => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!("expected object, got {}", value_type_name(value)),
                     path,
                 ));
@@ -634,7 +661,7 @@ impl<'a> Validator<'a> {
                         && !self.schema_allows_null(&prop_schema.schema)
                     {
                         result.add_error(FormError::new(
-                            "REQUIRED_FIELD_MISSING",
+                            "REQUIRED",
                             format!("required field '{}' cannot be null", prop_name),
                             &prop_path,
                         ));
@@ -661,7 +688,7 @@ impl<'a> Validator<'a> {
 
                     if prop_schema.required {
                         result.add_error(FormError::new(
-                            "REQUIRED_FIELD_MISSING",
+                            "REQUIRED",
                             format!("required field '{}' is missing", prop_name),
                             &prop_path,
                         ));
@@ -741,7 +768,7 @@ impl<'a> Validator<'a> {
             Some(arr) => arr,
             None => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!("expected array, got {}", value_type_name(value)),
                     path,
                 ));
@@ -802,9 +829,9 @@ impl<'a> Validator<'a> {
             }
         }
 
-        if !schema.values.contains(value) {
+        if !schema.values.iter().any(|v| json_value_eq(v, value)) {
             result.add_error(FormError::new(
-                "INVALID_ENUM_VALUE",
+                "INVALID_ENUM",
                 format!(
                     "value must be one of: {}",
                     schema
@@ -829,9 +856,9 @@ impl<'a> Validator<'a> {
     ) -> Result<ValidationResult> {
         let mut result = ValidationResult::new();
 
-        if value != &schema.value {
+        if !json_value_eq(value, &schema.value) {
             result.add_error(FormError::new(
-                "INVALID_LITERAL_VALUE",
+                "INVALID_LITERAL",
                 format!("expected literal {}, got {}", schema.value, value),
                 path,
             ));
@@ -848,7 +875,7 @@ impl<'a> Validator<'a> {
     ) -> Result<ValidationResult> {
         let mut result = ValidationResult::new();
         result.add_error(FormError::new(
-            "TYPE_MISMATCH",
+            "TYPE_ERROR",
             format!("expected never, got {}", value_type_name(value)),
             path,
         ));
@@ -872,7 +899,7 @@ impl<'a> Validator<'a> {
             Some(arr) => arr,
             None => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!("expected tuple (array), got {}", value_type_name(value)),
                     path,
                 ));
@@ -882,7 +909,7 @@ impl<'a> Validator<'a> {
 
         if arr.len() != schema.items.len() {
             result.add_error(FormError::new(
-                "TUPLE_LENGTH_MISMATCH",
+                "INVALID_TUPLE",
                 format!(
                     "tuple must have exactly {} items, got {}",
                     schema.items.len(),
@@ -927,7 +954,7 @@ impl<'a> Validator<'a> {
         // No variant matched
         let mut result = ValidationResult::new();
         result.add_error(FormError::new(
-            "UNION_NO_MATCH",
+            "INVALID_UNION",
             "value does not match any variant in union",
             path,
         ));
@@ -973,7 +1000,7 @@ impl<'a> Validator<'a> {
             Some(obj) => obj,
             None => {
                 result.add_error(FormError::new(
-                    "TYPE_MISMATCH",
+                    "TYPE_ERROR",
                     format!("expected object (record), got {}", value_type_name(value)),
                     path,
                 ));
@@ -1038,12 +1065,49 @@ impl<'a> Validator<'a> {
         path: &str,
         ctx: &mut EvalContext,
     ) -> Result<ValidationResult> {
-        let type_schema = self
-            .schema
-            .resolve_ref(name)
-            .ok_or_else(|| WelError::RefNotFound(name.to_string()))?;
+        self.validate_ref_inner(name, value, path, ctx, &mut Vec::new())
+    }
 
-        self.validate_type(type_schema, value, path, ctx)
+    fn validate_ref_inner(
+        &self,
+        name: &str,
+        value: &mut Value,
+        path: &str,
+        ctx: &mut EvalContext,
+        seen_refs: &mut Vec<String>,
+    ) -> Result<ValidationResult> {
+        if seen_refs.iter().any(|seen| seen == name) {
+            let mut cycle = seen_refs.clone();
+            cycle.push(name.to_string());
+            let mut result = ValidationResult::new();
+            result.add_error(FormError::new(
+                "REF_CYCLE",
+                format!("schema reference cycle detected: {}", cycle.join(" -> ")),
+                path,
+            ));
+            return Ok(result);
+        }
+
+        match self.schema.resolve_ref(name) {
+            Some(TypeSchema::Ref { name: next }) => {
+                seen_refs.push(name.to_string());
+                let result = self.validate_ref_inner(next, value, path, ctx, seen_refs);
+                seen_refs.pop();
+                result
+            }
+            Some(type_schema) => self.validate_type(type_schema, value, path, ctx),
+            None => {
+                // Match the TypeScript runtime: an unresolvable $ref is an
+                // in-band validation error, not a hard Err that aborts the call.
+                let mut result = ValidationResult::new();
+                result.add_error(FormError::new(
+                    "REF_NOT_FOUND",
+                    format!("schema reference not found: {name}"),
+                    path,
+                ));
+                Ok(result)
+            }
+        }
     }
 
     fn schema_fills_missing(&self, schema: &TypeSchema) -> bool {
@@ -1190,6 +1254,31 @@ fn escape_pointer_segment(s: &str) -> String {
     s.replace('~', "~0").replace('/', "~1")
 }
 
+/// Value equality matching the TypeScript runtime's `isEqualValue`: numbers
+/// compare by numeric value (so `1 == 1.0`), everything else is deep structural
+/// equality. serde_json's derived `PartialEq` is variant-sensitive for numbers
+/// (`Number(Int(1)) != Number(Float(1.0))`), which diverges from JS `===`; this
+/// restores cross-runtime parity for enum/literal matching.
+/// See conformance: enum-number-int-vs-float, literal-number-int-vs-float.
+pub(crate) fn json_value_eq(a: &Value, b: &Value) -> bool {
+    match (a, b) {
+        (Value::Number(x), Value::Number(y)) => match (x.as_f64(), y.as_f64()) {
+            (Some(xf), Some(yf)) => xf == yf,
+            _ => x == y,
+        },
+        (Value::Array(xs), Value::Array(ys)) => {
+            xs.len() == ys.len() && xs.iter().zip(ys).all(|(x, y)| json_value_eq(x, y))
+        }
+        (Value::Object(xo), Value::Object(yo)) => {
+            xo.len() == yo.len()
+                && xo
+                    .iter()
+                    .all(|(k, x)| yo.get(k).is_some_and(|y| json_value_eq(x, y)))
+        }
+        _ => a == b,
+    }
+}
+
 /// Convenience function to validate a value against a schema.
 ///
 /// Uses the global static registry for zero-allocation predicate lookups.
@@ -1261,7 +1350,7 @@ mod tests {
         let mut value = json!({"age": 30});
         let result = validate(&schema, &mut value).unwrap();
         assert!(!result.is_valid());
-        assert_eq!(result.errors[0].code, "REQUIRED_FIELD_MISSING");
+        assert_eq!(result.errors[0].code, "REQUIRED");
     }
 
     #[test]
@@ -1274,7 +1363,7 @@ mod tests {
         let mut value = json!({"name": null});
         let result = validate(&non_nullable, &mut value).unwrap();
         assert!(!result.is_valid());
-        assert_eq!(result.errors[0].code, "REQUIRED_FIELD_MISSING");
+        assert_eq!(result.errors[0].code, "REQUIRED");
         assert_eq!(result.errors[0].path, "/name");
 
         let nullable = Schema::new(
@@ -1439,7 +1528,7 @@ mod tests {
         let mut value = json!("yellow");
         let result = validate(&schema, &mut value).unwrap();
         assert!(!result.is_valid());
-        assert_eq!(result.errors[0].code, "INVALID_ENUM_VALUE");
+        assert_eq!(result.errors[0].code, "INVALID_ENUM");
     }
 
     #[test]
@@ -1453,7 +1542,7 @@ mod tests {
         let mut value = json!("inactive");
         let result = validate(&schema, &mut value).unwrap();
         assert!(!result.is_valid());
-        assert_eq!(result.errors[0].code, "INVALID_LITERAL_VALUE");
+        assert_eq!(result.errors[0].code, "INVALID_LITERAL");
     }
 
     #[test]
@@ -1463,7 +1552,7 @@ mod tests {
         let mut value = json!("anything");
         let result = validate(&schema, &mut value).unwrap();
         assert!(!result.is_valid());
-        assert_eq!(result.errors[0].code, "TYPE_MISMATCH");
+        assert_eq!(result.errors[0].code, "TYPE_ERROR");
     }
 
     #[test]
@@ -1480,7 +1569,7 @@ mod tests {
         let mut value = json!(["name"]);
         let result = validate(&schema, &mut value).unwrap();
         assert!(!result.is_valid());
-        assert_eq!(result.errors[0].code, "TUPLE_LENGTH_MISMATCH");
+        assert_eq!(result.errors[0].code, "INVALID_TUPLE");
 
         let mut value = json!(["name", "bad"]);
         let result = validate(&schema, &mut value).unwrap();

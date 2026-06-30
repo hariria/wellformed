@@ -1,0 +1,19 @@
+{
+  "name": "string-unicode-scalar-length",
+  "note": "Locks a confirmed GOOD behavior: length counts Unicode scalar values in both runtimes (TS Array.from().length, Rust chars().count()), not UTF-16 code units. Two astral emoji = length 2, so max_len 2 passes. If anyone regresses TS to .length (UTF-16), this goes red (each emoji would count as 2).",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "string",
+      "constraints": [
+        {
+          "pred": { "type": "max_len", "len": 2 },
+          "error": { "code": "TOO_LONG", "message": "Too long" }
+        }
+      ]
+    }
+  },
+  "input": "😀😀",
+  "expect": { "valid": true },
+  "status": "agree"
+}

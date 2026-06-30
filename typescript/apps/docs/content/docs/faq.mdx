@@ -33,10 +33,19 @@ same definitions in both runtimes. Two honest caveats:
   the built-in domain predicates (`ssn()`, `iban()`, ...) and `templateLiteral()`
   over hand-rolled regex. If you do reach for `.regex()`, stick to the portable
   subset (no lookahead, lookbehind, or backreferences).
-- **There is not yet a shared conformance suite.** Each runtime has its own
-  tests. If exact parity is load-bearing for you, lean on the built-in
+- **Huge numbers are outside the portable numeric domain.** JSON numbers are
+  compared with JavaScript-compatible semantics, so `1` and `1.0` match. For
+  numeric transforms such as `money_to_cents` and `format_decimal`, parity is
+  guaranteed for finite values whose scaled integer fits inside JavaScript's safe
+  integer range. Extremely large values may overflow or render differently across
+  runtimes. Use strings for exact identifiers, account numbers, or 64-bit values.
+- **A shared conformance suite now pins parity.** Cross-runtime fixtures in
+  `/conformance` run the same JSON through both runtimes in CI, so divergences
+  are caught rather than discovered in production. It is seeded and growing: a
+  known divergence is recorded as a living test and promoted to "must match"
+  once closed. If exact parity is load-bearing for you, lean on the built-in
   predicates, which are the controlled, hand-written path, rather than
-  runtime-specific features.
+  runtime-specific regex features.
 
 ## Do I get TypeScript types from a schema loaded at runtime?
 

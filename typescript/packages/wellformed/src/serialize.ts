@@ -1048,7 +1048,7 @@ function normalizeTemplateConstraint(
       return {
         pred: { type: "in", path: "", values },
         error: {
-          code: "INVALID_ENUM_VALUE",
+          code: "INVALID_ENUM",
           message: message ?? `Must be one of: ${JSON.stringify(values)}`,
           severity: "error",
           source,

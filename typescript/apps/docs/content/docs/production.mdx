@@ -1,0 +1,156 @@
+---
+title: Production Use
+description: Operational guidance for using wellformed safely in production
+---
+
+Use this as the launch checklist before wellformed evaluates production input.
+
+| Decision | Production default |
+|---|---|
+| Runtime imports | Use subpath imports at validation-only boundaries. |
+| Schema storage | Store a schema id and application schema version beside the IR. |
+| Unknown keys | Prefer `.strict()` or `.strip()` for external input. |
+| Errors | Treat `code` as API. Treat `message` as display copy. |
+| Custom predicates | Register the same names and semantics in every runtime. |
+| Sensitive data | Mask logs and avoid real personal data in fixtures. |
+
+## Keep Bundles Narrow
+
+The package exposes subpath entrypoints for apps that do not need the full authoring surface at runtime. For example, a client that only validates a serialized schema can avoid importing the builder DSL:
+
+```ts
+import type { Schema } from "wellformed-ts/ir";
+import { validate } from "wellformed-ts/runtime";
+```
+
+Schema authoring and serialization can use their own entrypoints:
+
+```ts
+import { w } from "wellformed-ts/builder";
+import { parseSchema, schemaToJSON } from "wellformed-ts/serialize";
+```
+
+The top-level `wellformed` import remains supported for convenience. Use subpaths in production code when bundle size matters or when a server/client boundary only needs validation.
+
+Published JavaScript is minified, source maps are not included in the npm package, and shared code is split across entrypoint chunks so modern bundlers can discard unused exports more effectively.
+
+## Version Schemas Explicitly
+
+Always serialize full schemas with a version:
+
+```ts
+const schema = taxpayerSchema.toSchema("1.0");
+```
+
+The `version` field is the IR version, not your application release. Store your own schema identifier and migration metadata alongside the JSON if schemas are persisted:
+
+```json
+{
+  "schema_id": "taxpayer-intake",
+  "schema_version": 3,
+  "wellformed_ir": {
+    "version": "1.0",
+    "root": { "type": "object" }
+  }
+}
+```
+
+Use immutable schema versions for submitted records. If validation rules change, keep the old schema available for historical records and apply the new schema only to new submissions or explicit migrations.
+
+## Treat Error Codes as API
+
+Every constraint includes an error code and message. Use `code` for application logic and translations. Treat `message` as display text.
+
+```ts
+w.string().email({
+  code: "CONTACT_EMAIL_INVALID",
+  message: "Enter a valid email address",
+  help: "Use a format like name@example.com",
+});
+```
+
+Stable codes make it possible to localize messages, group analytics, and migrate UI copy without changing validation behavior.
+
+## Choose Unknown-Key Behavior
+
+Object schemas are required by default, but unknown keys deserve an explicit policy:
+
+```ts
+w.object({ name: w.string() }).strict();      // reject unknown keys
+w.object({ name: w.string() }).strip();       // remove unknown keys from output
+w.object({ name: w.string() }).passthrough(); // keep unknown keys
+w.object({ name: w.string() }).catchall(w.string()); // validate unknown values
+```
+
+For external input, prefer `.strict()` or `.strip()` unless your API intentionally accepts extension fields.
+
+## Normalize Before Validating
+
+Transforms run before constraints, so the validated output may differ from the input:
+
+```ts
+const schema = w.object({
+  ssn: w.string().trim().digitsOnly().ssn(),
+}).toSchema("1.0");
+
+const result = validate(schema, { ssn: " 123-45-6789 " });
+// result.value.ssn === "123456789"
+```
+
+Persist the transformed output when downstream systems expect canonical values. Persist raw input separately only if you have a clear audit requirement and an appropriate data-retention policy.
+
+## Register Custom Predicates Everywhere
+
+Custom predicates are serialized by name:
+
+```json
+{ "type": "call", "name": "is_internal_account" }
+```
+
+The implementation is not serialized. Every runtime that evaluates the schema must register the same predicate name with equivalent semantics. If the TypeScript frontend and Rust backend disagree, the same data can pass in one runtime and fail in another.
+
+Treat custom predicate names as stable contracts. Rewriting an implementation for speed is fine when pass/fail behavior stays the same. Behavior-changing updates should use a new predicate name or an explicit `args` option.
+
+Use custom predicates for organization-specific checks, but prefer built-ins for common domain identifiers so schemas stay portable.
+
+For persisted submissions, store the application schema id or schema hash that
+validated the data. If you need to reproduce exact historical validation
+behavior, also store the `wellformed-ts` package version or Rust crate version
+used by the validating service.
+
+## Handle Sensitive Data Deliberately
+
+wellformed validates data; it does not encrypt, redact, authorize, or decide retention. When schemas include sensitive fields such as TINs, account numbers, healthcare identifiers, or payment data:
+
+- Mask values before logging.
+- Avoid placing real data in examples, issues, or test fixtures.
+- Use field-specific transforms such as `maskSsn()` only for presentation copies, not as a substitute for access control.
+- Review compliance requirements for the data category before storing raw submissions.
+
+## Runtime Compatibility
+
+The TypeScript and Rust runtimes share the same JSON IR shape, but not every future extension is guaranteed to be implemented in both runtimes on the same day. Before relying on a feature in production:
+
+1. Serialize an example schema.
+2. Validate representative valid and invalid data in each runtime you will deploy.
+3. Add regression tests for the serialized IR, not only the builder code.
+
+Use the same fixtures for frontend and backend validation. A good fixture set has
+valid examples, invalid examples, transformed output expectations, unknown-key
+behavior, and custom predicate cases.
+
+Both runtimes resolve `ref` schemas through top-level `definitions`. Treat unresolved references and reference cycles as schema authoring errors: validate loaded schemas during startup, fail closed when validation reports `REF_NOT_FOUND` or `REF_CYCLE`, and keep tests for recursive or deeply nested schemas if you accept hand-written IR.
+
+## Release Discipline
+
+Until wellformed reaches 1.0, pin exact versions in production applications and read the changelog before upgrading. For published schemas, keep a compatibility test suite that validates saved IR against the new runtime before rollout.
+
+When upgrading for performance work, the expected result is no behavior change.
+Run representative valid and invalid examples through both old and new runtimes.
+If a predicate intentionally changes meaning, migrate schemas to a new predicate
+name or explicit `args` option instead of relying on deployment timing.
+
+Avoid runtime-only behavior in portable schemas. Custom predicates should be
+pure and deterministic; permission checks, database lookups, fraud checks, and
+other environment-dependent decisions belong in application code around
+validation.

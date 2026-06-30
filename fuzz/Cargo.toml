@@ -1,0 +1,29 @@
+[package]
+name = "wellformed-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+serde_json = "1.0"
+wellformed = { path = "../wellformed" }
+
+[[bin]]
+name = "serde_schema"
+path = "fuzz_targets/serde_schema.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "validate_json"
+path = "fuzz_targets/validate_json.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

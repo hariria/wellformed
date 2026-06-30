@@ -1,0 +1,11 @@
+{
+  "name": "format-decimal-multiply-round",
+  "note": "C4 (proper fix): format_decimal uses the same multiply-then-round model as money_to_cents, identical in both runtimes. 2.675 at 2 places -> '2.68' (we intentionally do not mirror JS toFixed, which would give '2.67' and disagree with money_to_cents).",
+  "schema": {
+    "version": "1.0",
+    "root": { "type": "string", "transforms": [{ "fn": "format_decimal", "places": 2 }] }
+  },
+  "input": "2.675",
+  "expect": { "valid": true, "value": "2.68" },
+  "status": "agree"
+}

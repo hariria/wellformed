@@ -1,0 +1,54 @@
+name: Bug Report
+description: Report a reproducible bug
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Please include enough detail to reproduce quickly.
+        Do not include real TINs, SSNs, account numbers, healthcare identifiers,
+        payment data, or other sensitive personal data. Use synthetic examples.
+        Do not report security vulnerabilities in public issues; use the
+        vulnerability reporting process in SECURITY.md.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+      placeholder: Concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Steps, code sample, and synthetic or redacted inputs to reproduce.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      placeholder: What should have happened?
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Versions and platform details
+      placeholder: |
+        - Rust:
+        - Node:
+        - pnpm:
+        - OS:
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Redacted logs, screenshots, or related links

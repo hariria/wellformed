@@ -1,0 +1,8 @@
+{
+  "name": "money-transform-unparseable",
+  "note": "P2: a money field given an unparseable string is non-fatal in both runtimes. The transform leaves the value unchanged and the type check reports it in-band (valid:false), rather than Rust aborting with an out-of-band Err.",
+  "schema": { "version": "1.0", "root": { "type": "money", "transforms": [{ "fn": "money_to_cents", "scale": 2 }] } },
+  "input": "abc",
+  "expect": { "valid": false },
+  "status": "agree"
+}

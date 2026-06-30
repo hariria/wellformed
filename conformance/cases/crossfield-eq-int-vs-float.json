@@ -1,0 +1,17 @@
+{
+  "name": "crossfield-eq-int-vs-float",
+  "note": "C3 sibling: a cross-field eq rule (x equals 1) now uses numeric equality in Rust, so input {x: 1.0} passes, matching TS and consistent with enum/literal. Previously Rust used raw serde_json equality and rejected it.",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "object",
+      "properties": { "x": { "type": "number" } },
+      "rules": [
+        { "pred": { "type": "eq", "path": "/x", "value": 1 }, "error": { "code": "X_MUST_BE_1", "message": "x must be 1" } }
+      ]
+    }
+  },
+  "input": { "x": 1.0 },
+  "expect": { "valid": true },
+  "status": "agree"
+}

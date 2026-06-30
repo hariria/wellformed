@@ -1,0 +1,19 @@
+{
+  "name": "string-minlen-invalid",
+  "note": "Parity guard on the valid flag: a 2-char string fails min_len 3 in both runtimes. (Structural error codes differ between runtimes; this case asserts only validity, not codes.)",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "string",
+      "constraints": [
+        {
+          "pred": { "type": "min_len", "len": 3 },
+          "error": { "code": "TOO_SHORT", "message": "Too short" }
+        }
+      ]
+    }
+  },
+  "input": "ab",
+  "expect": { "valid": false },
+  "status": "agree"
+}

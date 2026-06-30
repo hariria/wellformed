@@ -1,0 +1,14 @@
+{
+  "name": "money-to-cents-negative-half",
+  "note": "M4: money_to_cents rounds half-away-from-zero in both runtimes. -0.025 at scale 2 -> -3 cents. TS previously used Math.round (half toward +Infinity) -> -2.",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "number",
+      "transforms": [{ "fn": "money_to_cents", "scale": 2 }]
+    }
+  },
+  "input": -0.025,
+  "expect": { "valid": true, "value": -3 },
+  "status": "agree"
+}

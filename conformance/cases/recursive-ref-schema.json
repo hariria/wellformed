@@ -1,0 +1,20 @@
+{
+  "name": "recursive-ref-schema",
+  "note": "C1: a recursive schema (linked list) over finite data validates in both runtimes. Each follows the data and terminates; recursion is bounded by depth, not by re-entering the same $ref name. (Previously TS's name-keyed guard false-positived at depth>=2.)",
+  "schema": {
+    "version": "1.0",
+    "definitions": {
+      "Node": {
+        "type": "object",
+        "properties": {
+          "value": { "type": "number" },
+          "next": { "type": "ref", "$ref": "Node", "required": false }
+        }
+      }
+    },
+    "root": { "type": "ref", "$ref": "Node" }
+  },
+  "input": { "value": 1, "next": { "value": 2 } },
+  "expect": { "valid": true },
+  "status": "agree"
+}

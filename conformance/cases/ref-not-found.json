@@ -1,0 +1,8 @@
+{
+  "name": "ref-not-found",
+  "note": "An unresolvable $ref is an in-band validation error (REF_NOT_FOUND) in both runtimes, not an out-of-band exception. Rust previously returned Err(RefNotFound).",
+  "schema": { "version": "1.0", "root": { "type": "ref", "$ref": "DoesNotExist" } },
+  "input": 1,
+  "expect": { "valid": false, "code": "REF_NOT_FOUND" },
+  "status": "agree"
+}

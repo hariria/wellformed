@@ -1,0 +1,25 @@
+export const docsRoute = "/docs";
+
+// Internal route that renders a page as raw markdown. At build time the
+// prerendered output is relocated to `/docs/<slug>.md` (see scripts/relocate-md.mjs)
+// and a dev-server middleware serves the same URLs during `pnpm dev`.
+export const markdownGenRoute = "/_docs-md";
+
+export const siteUrl = "https://wellformed.net";
+
+export const siteMetadata = {
+  name: "wellformed",
+  url: siteUrl,
+  description:
+    "Author validation schemas in TypeScript, compile them to a portable JSON IR, and run the same rules in TypeScript and Rust.",
+  ogImage: "/og-image.png",
+  ogImageAlt: "wellformed: validation logic, as portable data.",
+};
+
+export const gitConfig = {
+  user: "hariria",
+  repo: "wellformed",
+  branch: "main",
+  // Path to the docs content within the repo, for "edit on GitHub" links.
+  contentDir: "typescript/apps/docs/content/docs",
+};

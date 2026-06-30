@@ -1,0 +1,14 @@
+{
+  "name": "format-decimal-negative-half",
+  "note": "C4 (negative): half-away-from-zero means -2.5 -> '-3' at 0 places in both runtimes.",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "string",
+      "transforms": [{ "fn": "format_decimal", "places": 0 }]
+    }
+  },
+  "input": "-2.5",
+  "expect": { "valid": true, "value": "-3" },
+  "status": "agree"
+}

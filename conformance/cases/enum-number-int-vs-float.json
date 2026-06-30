@@ -1,0 +1,20 @@
+{
+  "name": "enum-number-int-vs-float",
+  "note": "C3: a JSON number written as 1.0 should match the integer enum member 1. TS uses numeric equality (1 === 1.0); Rust compares serde_json::Number variants (Float(1.0) != Int(1)) and rejects. Target: numeric equality (valid).",
+  "schema": {
+    "version": "1.0",
+    "root": {
+      "type": "enum",
+      "values": [
+        0,
+        1,
+        2
+      ]
+    }
+  },
+  "input": 1.0,
+  "expect": {
+    "valid": true
+  },
+  "status": "agree"
+}

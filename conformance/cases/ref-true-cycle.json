@@ -1,0 +1,8 @@
+{
+  "name": "ref-true-cycle",
+  "note": "P1: a self-referential schema (A -> ref A) that consumes no data is rejected in-band (valid:false) in both runtimes, with no crash and no out-of-band Err.",
+  "schema": { "version": "1.0", "definitions": { "A": { "type": "ref", "$ref": "A" } }, "root": { "type": "ref", "$ref": "A" } },
+  "input": 1,
+  "expect": { "valid": false, "code": "REF_CYCLE" },
+  "status": "agree"
+}

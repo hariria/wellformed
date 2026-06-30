@@ -1,0 +1,27 @@
+{
+  "version": "1.0.0",
+  "id": "simple_form",
+  "title": "Simple Test Form",
+  "description": "A simple form for testing codegen",
+  "root": {
+    "type": "object",
+    "description": "Simple form data",
+    "properties": {
+      "name": {
+        "type": "string",
+        "description": "The person's name",
+        "required": true
+      },
+      "age": {
+        "type": "integer",
+        "description": "The person's age",
+        "required": false
+      },
+      "email": {
+        "type": "string",
+        "description": "Email address",
+        "required": true
+      }
+    }
+  }
+}

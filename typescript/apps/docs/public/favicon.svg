@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100" role="img" aria-label="wellformed">
+  <rect width="100" height="100" rx="23" fill="#17181B"></rect>
+  <g font-weight="600" text-anchor="middle" dominant-baseline="central">
+    <text x="20" y="51" font-family="&#39;JetBrains Mono&#39;, ui-monospace, monospace" font-size="60" fill="#76CE54">{</text>
+    <text x="50" y="51" font-family="&#39;Space Grotesk&#39;, system-ui, sans-serif" font-size="44" font-weight="700" fill="#FFFFFF">w</text>
+    <text x="80" y="51" font-family="&#39;JetBrains Mono&#39;, ui-monospace, monospace" font-size="60" fill="#76CE54">}</text>
+  </g>
+</svg>

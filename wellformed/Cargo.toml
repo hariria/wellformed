@@ -37,7 +37,7 @@ wellformed-validate = { version = "0.1.0", path = "../wellformed-validate" }
 rayon = "1.11.0"
 
 [dev-dependencies]
-serial_test = "3"
+serial_test = "4"
 proptest = "1"
 
 [[bench]]
